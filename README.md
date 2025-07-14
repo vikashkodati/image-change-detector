@@ -2,6 +2,8 @@
 
 A satellite image change detection web application built with Next.js and Python.
 
+Read claude.md to understand current status of project. 
+
 ## Features
 
 - Upload before/after satellite images
