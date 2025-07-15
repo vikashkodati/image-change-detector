@@ -10,6 +10,22 @@ export default function Home() {
   const [beforeImage, setBeforeImage] = useState<File | null>(null);
   const [afterImage, setAfterImage] = useState<File | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [results, setResults] = useState<any>(null);
+
+  // Convert File to base64 string
+  const fileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => {
+        const result = reader.result as string;
+        // Remove data URL prefix (data:image/jpeg;base64,)
+        const base64 = result.split(',')[1];
+        resolve(base64);
+      };
+      reader.onerror = error => reject(error);
+    });
+  };
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>, type: 'before' | 'after') => {
     const file = event.target.files?.[0];
@@ -29,11 +45,48 @@ export default function Home() {
     }
     
     setIsProcessing(true);
-    // TODO: Implement actual processing
-    setTimeout(() => {
+    
+    try {
+      // Convert images to base64
+      const beforeBase64 = await fileToBase64(beforeImage);
+      const afterBase64 = await fileToBase64(afterImage);
+      
+      // Call FastMCP server to detect changes
+      const response = await fetch('http://127.0.0.1:8000/mcp/call', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          method: 'detect_image_changes',
+          params: {
+            before_image_base64: beforeBase64,
+            after_image_base64: afterBase64
+          }
+        })
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      setResults(data);
+      
+      // Show basic results for now
+      if (data.success) {
+        const changePercent = data.results.change_percentage;
+        alert(`Analysis complete! ${changePercent}% of pixels changed.`);
+      } else {
+        alert(`Analysis failed: ${data.error}`);
+      }
+      
+    } catch (error) {
+      console.error('Error analyzing images:', error);
+      alert('Failed to analyze images. Please try again.');
+    } finally {
       setIsProcessing(false);
-      alert('Analysis complete! (This is a placeholder)');
-    }, 2000);
+    }
   };
 
   return (
