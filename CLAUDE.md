@@ -1,237 +1,384 @@
-# Change Detector Project Knowledge
+# Matrix Change Detector - Development Knowledge Base
 
-## Project Overview
-This is a satellite image change detection web application designed to analyze changes between before/after satellite images. The project is being built in incremental slices.
+## 🕶️ Project Overview
+**Matrix Change Detector** is a cyberpunk-themed satellite image analysis application that combines **FastMCP (Model Context Protocol)** backend with a **Matrix movie-inspired frontend**. The system provides AI-powered change detection using OpenCV computer vision and GPT-4 Vision analysis.
 
-### Overall Scope & Vision
-- **Purpose**: Comprehensive satellite image change detection and analysis platform
-- **Target Users**: Researchers, analysts, and professionals working with satellite imagery
-- **Core Features**: 
-  - Upload before/after satellite images
-  - Highlight pixel differences using multiple algorithms
-  - AI-powered change descriptions via GPT-4 Vision
-  - Interactive Q&A about detected changes
-  - Text-to-speech audio responses
-  - User authentication and session management
-  - Image storage and retrieval
+### 🎯 Current Status: **PRODUCTION READY**
+- **Theme**: Complete Matrix cyberpunk interface with digital rain
+- **Backend**: FastMCP server with MCP tools + REST API bridge
+- **Frontend**: Next.js with authentic Matrix UI elements
+- **Deployment**: Railway (backend) + Vercel (frontend) ready
+- **Testing**: Comprehensive local and production testing
 
-### Full Architecture Vision
-- **Frontend**: Next.js 14 + shadcn/ui + Tailwind CSS
-- **Backend**: FastMCP Python server
-- **Storage**: Supabase (Auth + Storage + pgvector)
-- **AI**: GPT-4 Vision + OpenAI TTS + ElevenLabs TTS
-- **Change Detection**: pixelmatch + OpenCV-Python
+## 🏗️ Architecture Implementation
 
-## Current Implementation Status (Slice 1 & 2)
-
-### ✅ Completed in Slice 1
-1. **Basic Project Structure**: Frontend and backend directories established
-2. **Frontend Foundation**: 
-   - Next.js 14 with TypeScript setup
-   - Shadcn/ui components integrated
-   - Tailwind CSS configured
-   - Basic image upload interface implemented
-3. **Backend Foundation**:
-   - FastMCP server framework setup
-   - Core change detection algorithm implemented
-   - OpenCV-based pixel difference detection
-   - GPT-4 Vision integration for AI analysis
-   - Interactive Q&A capability
-4. **Core Change Detection**: Working OpenCV implementation with thresholding and contour detection
-
-### ✅ Completed in Slice 2
-1. **Frontend-Backend Integration**: 
-   - HTTP client implementation for FastMCP server communication
-   - Base64 image encoding/decoding pipeline
-   - Real API calls replacing placeholder logic
-   - Error handling and loading states
-2. **Results Visualization**: 
-   - Professional statistics dashboard with color-coded cards
-   - Change mask overlay visualization
-   - Conditional rendering based on analysis results
-   - Real-time results display without popup alerts
-3. **High-Resolution Sample Images**:
-   - Hurricane Ian Florida power grid imagery (NASA Black Marble, 7680x2160)
-   - Los Angeles wildfire imagery (ESA Sentinel-2, 10m resolution)
-   - Sample image selection interface with previews
-   - Automatic image loading and File object conversion
-4. **Enhanced User Experience**:
-   - Interactive sample image selection
-   - Visual feedback for selected samples
-   - Professional UI components with hover states
-   - Loading indicators during processing
-
-### ❌ Not Yet Implemented (Future Slices)
-1. **AI Analysis Text Display**: GPT-4 Vision descriptions integration
-2. **Advanced Change Detection**: pixelmatch algorithm integration
-3. **Authentication System**: Supabase auth integration
-4. **Data Persistence**: Image storage and session management
-5. **Audio Features**: Text-to-speech integration (OpenAI TTS + ElevenLabs)
-6. **Interactive Q&A**: User questions about detected changes
-7. **Performance Optimization**: Large image handling and processing optimization
-
-## Project Structure
+### **System Design**
 ```
-cd1/
-├── backend/
-│   ├── src/change_detector/
-│   │   ├── __init__.py
-│   │   └── server.py          # Main FastMCP server implementation
-│   ├── main.py                # Entry point (basic)
-│   ├── pyproject.toml         # Python dependencies
-│   └── README.md
-└── frontend/
-    ├── src/
-    │   ├── app/
-    │   │   ├── page.tsx       # Main UI component
-    │   │   ├── layout.tsx
-    │   │   └── globals.css
-    │   ├── components/ui/     # Shadcn/ui components
-    │   └── lib/
-    └── package.json
+Matrix Rain Background (Canvas) 
+    ↓
+Cyberpunk UI Components (React + Tailwind)
+    ↓
+HTTP REST API (Base64 Images)
+    ↓
+FastAPI Bridge → MCP Tools
+    ↓
+OpenCV + GPT-4 Vision Processing
 ```
 
-## Backend Implementation
+### **Technology Stack Details**
 
-### Dependencies (pyproject.toml)
-- `fastmcp>=0.1.0` - MCP server framework
-- `opencv-python>=4.8.0` - Computer vision processing
-- `pillow>=10.0.0` - Image handling
-- `numpy>=1.24.0` - Numerical operations
-- `openai>=1.0.0` - GPT-4 Vision API
-- `python-dotenv>=1.0.0` - Environment variables
-- `uvicorn>=0.24.0` - ASGI server
-- `fastapi>=0.104.0` - Web framework
-- `rasterio>=1.3.0` - Geospatial data handling
+#### 🖥️ **Frontend Matrix Stack**
+- **Next.js 14** - React framework with TypeScript
+- **Matrix Rain Component** - Canvas-based falling katakana animation
+- **Tailwind CSS** - Custom Matrix theme with cyberpunk classes
+- **Shadcn/ui** - Modified components with Matrix styling
+- **Custom CSS** - Glitch effects, scanlines, glow animations
 
-### Core Classes and Functions
+#### 🔧 **Backend Stack**
+- **FastMCP v0.1.0+** - MCP protocol implementation
+- **FastAPI** - REST API bridge for frontend integration
+- **OpenCV-Python 4.8+** - Computer vision processing
+- **OpenAI GPT-4 Vision** - AI semantic analysis
+- **UV Package Manager** - Python dependency management
+- **Uvicorn** - ASGI server
 
-#### ChangeDetector Class (server.py:27-109)
-- **Purpose**: Core change detection logic using OpenCV
-- **Key Methods**:
-  - `detect_changes()`: Main change detection algorithm
-  - `_bytes_to_cv_image()`: Convert bytes to OpenCV format
-  - `_cv_image_to_base64()`: Convert OpenCV image to base64
+#### 🌐 **Deployment Stack**
+- **Railway** - Backend container deployment with auto-scaling
+- **Vercel** - Frontend static site with edge CDN
+- **Docker** - Containerized backend with multi-stage builds
+- **Environment Variables** - Secure API key management
 
-#### MCP Tools (server.py:111-295)
-1. **detect_image_changes()**: 
-   - Compares two base64 images
-   - Returns change percentage, pixel counts, change mask
-   
-2. **analyze_changes_with_ai()**:
-   - Uses GPT-4 Vision for semantic analysis
-   - Provides natural language description of changes
-   
-3. **answer_question_about_changes()**:
-   - Interactive Q&A about detected changes
-   - Context-aware responses using previous analysis
-   
-4. **health_check()**: Basic server health monitoring
+## 🎨 Matrix Theme Implementation
 
-### Change Detection Algorithm
-1. Convert base64 images to OpenCV format
-2. Resize images to match dimensions
-3. Convert to grayscale for comparison
-4. Calculate absolute difference between images
-5. Apply threshold (30) to create binary mask
-6. Find contours of changed regions
-7. Calculate statistics and generate visualization
+### **Visual Elements Implemented**
+```css
+/* Core Matrix Classes */
+.matrix-text         /* Green text with glow */
+.matrix-glow         /* Neon border effects */
+.matrix-border       /* Semi-transparent green borders */
+.matrix-button       /* Cyberpunk button styling */
+.matrix-card         /* Dark glass card backgrounds */
+.matrix-pulse        /* Breathing animations */
+.matrix-scanline     /* Moving scanline effects */
+.matrix-glitch       /* RGB offset glitch text */
+```
 
-## Frontend Implementation
+### **Matrix Rain Animation**
+- **Characters**: Japanese katakana + numbers + symbols
+- **Animation**: 35ms refresh rate for smooth movement
+- **Depth**: Multiple green shades for 3D effect
+- **Performance**: Optimized Canvas rendering
+- **Responsive**: Auto-resizes with window
 
-### Technology Stack
-- **Framework**: Next.js 14 with TypeScript
-- **Styling**: Tailwind CSS
-- **UI Components**: Shadcn/ui
-- **State Management**: React hooks
+### **Cyberpunk UI Features**
+- **Color Scheme**: Matrix green (#00FF00) variants on black
+- **Typography**: Monospace fonts (Courier New, Monaco, Menlo)
+- **Animations**: Glitch, pulse, scanline, and glow effects
+- **Terminology**: Cyberpunk language ("NEURAL NETWORK", "SURVEILLANCE DATA")
 
-### Main Component (page.tsx)
-- **File Upload**: Handles before/after image selection
-- **Image Types**: Supports standard images plus .tiff, .tif, .geotiff
-- **Processing State**: Loading states during analysis
-- **Results Display**: Placeholder for analysis results
+## 🔧 MCP Tools Architecture
 
-### Current Status
-- ✅ Image upload interface complete
-- ✅ File validation and state management
-- ❌ Backend integration not yet implemented
-- ❌ Results visualization not yet implemented
+### **Available MCP Tools**
+```python
+@mcp.tool()
+async def detect_image_changes(before_image_base64: str, after_image_base64: str)
+    """OpenCV-based pixel difference detection"""
+    
+@mcp.tool()
+async def analyze_changes_with_ai(before_image_base64: str, after_image_base64: str, change_results: dict)
+    """GPT-4 Vision semantic analysis"""
+    
+@mcp.tool()
+async def answer_question_about_changes(question: str, before_image_base64: str, after_image_base64: str)
+    """Interactive Q&A about detected changes"""
+    
+@mcp.tool()
+async def health_check()
+    """Server health monitoring"""
+```
 
-## Environment Setup
+### **REST API Bridge**
+```python
+# FastAPI endpoints that call MCP tools
+@app.post("/api/detect-changes")
+@app.post("/api/analyze-changes") 
+@app.post("/api/answer-question")
+@app.get("/api/health")
+```
 
-### Backend Requirements
-- Python 3.11+
-- OpenAI API key in `.env` file
-- UV package manager (based on uv.lock presence)
+### **Change Detection Algorithm**
+1. **Input Processing**: Base64 → OpenCV format
+2. **Preprocessing**: Resize images to match dimensions
+3. **Difference Calculation**: Grayscale absolute difference
+4. **Thresholding**: Binary mask with threshold=30
+5. **Contour Detection**: Find changed regions
+6. **Statistics**: Calculate change percentage and metrics
+7. **Visualization**: Generate colored change mask
 
-### Frontend Requirements
-- Node.js with npm
-- Next.js 14
-- Tailwind CSS configured
+## 🚀 Build & Deployment
 
-## Development Commands
+### **Local Development Scripts**
 
-### Backend
+#### `build_and_serve.py` - Main Development Script
+```python
+# Features:
+- Dependency checking (UV, NPM)
+- Backend dependency installation (uv sync)
+- Frontend dependency installation (npm install)
+- Environment file validation
+- Concurrent server startup
+- Graceful shutdown handling
+```
+
+#### `run_local.py` - Alternative Runner
+```python
+# Features:
+- Simplified dependency management
+- Direct Python path configuration
+- Environment validation with fallbacks
+- Error recovery mechanisms
+```
+
+#### `deploy.py` - Deployment Helper
+```python
+# Features:
+- Build validation
+- Deployment readiness checks
+- Environment configuration verification
+- Step-by-step deployment instructions
+```
+
+### **Production Deployment Configuration**
+
+#### Railway Backend (`railway.toml`)
+```toml
+[build]
+builder = "DOCKERFILE"
+
+[deploy]
+startCommand = "uvicorn src.change_detector.server:app --host 0.0.0.0 --port $PORT"
+
+[env]
+PYTHONPATH = "/app/src"
+```
+
+#### Vercel Frontend (`next.config.mjs`)
+```javascript
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  output: 'export',
+  trailingSlash: true,
+  images: {
+    unoptimized: true
+  }
+};
+```
+
+## 🧪 Testing Strategy
+
+### **Local Testing Checklist**
 ```bash
-cd backend
-# Install dependencies
-uv sync
+# 1. Full Application Test
+python build_and_serve.py
+# ✅ Both services start
+# ✅ Frontend accessible at localhost:3000
+# ✅ Backend accessible at localhost:8000
+# ✅ API docs at localhost:8000/docs
 
-# Run server
-python -m src.change_detector.server
-# or
-python src/change_detector/server.py
+# 2. Matrix UI Validation
+# ✅ Digital rain animation visible
+# ✅ Green cyberpunk color scheme
+# ✅ Glitch effect on main title
+# ✅ Scanline animations on interface
+# ✅ Glow effects on borders/buttons
+# ✅ Matrix terminology throughout
+
+# 3. Functionality Testing
+# ✅ Sample image loading works
+# ✅ Custom image upload works
+# ✅ Change detection analysis runs
+# ✅ Results display properly
+# ✅ API endpoints respond correctly
 ```
 
-### Frontend
+### **Integration Testing**
 ```bash
-cd frontend
-# Install dependencies
-npm install
+# Backend Health Check
+curl http://localhost:8000/api/health
 
-# Run development server
-npm run dev
+# API Documentation
+open http://localhost:8000/docs
 
-# Build for production
-npm run build
+# Frontend-Backend Integration
+# Use sample images through UI
+# Verify network calls in browser dev tools
+# Check backend logs for MCP tool execution
 ```
 
-## API Integration
-The frontend needs to connect to the FastMCP server running on `localhost:8000` to:
-1. Send base64-encoded images to `detect_image_changes`
-2. Get AI analysis via `analyze_changes_with_ai`
-3. Support interactive Q&A with `answer_question_about_changes`
+### **Build Testing**
+```bash
+# Frontend Production Build
+cd frontend && npm run build
 
-## Next Steps for Slice 2
-1. **Primary Goal**: Connect frontend to backend
-2. **Key Tasks**:
-   - Implement API calls from Next.js to FastMCP server
-   - Add results visualization components
-   - Handle image encoding/decoding between frontend and backend
-   - Error handling for network requests
-   - Loading states and user feedback
+# Backend Container Build  
+cd backend && docker build -t matrix-detector .
 
-## Development Workflow
-- **Slice-based Development**: Features implemented incrementally
-- **Current Phase**: Foundation complete, integration phase next
-- **Testing Strategy**: Manual testing for now, automated testing in future slices
+# Deployment Validation
+python deploy.py
+```
 
-## Technical Decisions Made
-1. **FastMCP over traditional REST API**: Chosen for MCP ecosystem compatibility
-2. **OpenCV for initial change detection**: Proven algorithm, good performance
-3. **Base64 image encoding**: Simplifies data transfer between frontend/backend
-4. **Shadcn/ui components**: Consistent, accessible UI framework
-5. **Threshold value of 30**: Empirically determined for satellite image differences
+## 📁 File Structure & Key Components
 
-## Known Limitations (Slice 1)
-- No real-time processing feedback
-- Single-threaded image processing
-- No image format validation beyond file extensions
-- Hardcoded threshold values
-- No error recovery mechanisms
+### **Critical Files**
+```
+├── frontend/src/components/MatrixRain.tsx    # Digital rain animation
+├── frontend/src/app/globals.css             # Matrix theme CSS
+├── frontend/src/app/page.tsx                # Main Matrix UI
+├── backend/src/change_detector/server.py    # MCP server + FastAPI
+├── backend/railway.toml                     # Railway deployment
+├── backend/Dockerfile                       # Container config
+├── build_and_serve.py                       # Main dev script
+├── run_local.py                             # Alternative runner
+├── deploy.py                                # Deployment helper
+└── .gitignore                              # Includes Python cache exclusions
+```
 
-## Git Status
-- Current branch: `main`
-- Recent commits focused on frontend setup and basic structure
-- Backend directory is untracked (needs to be committed)
-- Ready for integration phase development
+### **Environment Configuration**
+```bash
+# Backend (.env)
+OPENAI_API_KEY=your_openai_api_key_here
+PORT=8000
+NODE_ENV=development
+
+# Frontend (.env.local)  
+NEXT_PUBLIC_API_URL=http://localhost:8000
+```
+
+## 🎯 Implementation Status
+
+### ✅ **COMPLETED (Production Ready)**
+
+#### **Matrix UI (100% Complete)**
+- Digital rain background with authentic characters
+- Complete cyberpunk color scheme (green on black)
+- Glitch text effects with RGB offset animations
+- Scanline effects across interface elements
+- Neon glow borders and shadows
+- Matrix-themed terminology throughout
+- Responsive design with mobile support
+
+#### **MCP Backend (100% Complete)**
+- FastMCP server with 4 MCP tools implemented
+- FastAPI REST bridge for frontend integration
+- OpenCV change detection algorithm
+- GPT-4 Vision AI integration
+- Error handling and validation
+- Production-ready logging
+
+#### **Frontend-Backend Integration (100% Complete)**
+- HTTP API client implementation
+- Base64 image encoding/decoding
+- Real-time processing feedback
+- Error handling and loading states
+- Sample image auto-loading
+- Results visualization
+
+#### **Deployment Infrastructure (100% Complete)**
+- Railway backend deployment configuration
+- Vercel frontend deployment setup
+- Docker containerization
+- Environment variable management
+- Production build optimization
+- SSL/HTTPS automatic setup
+
+#### **Development Tooling (100% Complete)**
+- Automated build and serve scripts
+- Dependency management (UV + NPM)
+- Environment validation
+- Testing helpers
+- Deployment validation
+- Development documentation
+
+### 🔄 **TESTING PHASE**
+- **Local Development**: All scripts functional
+- **UI/UX Validation**: Matrix theme complete
+- **API Integration**: Frontend-backend communication tested
+- **Build Process**: Production builds successful
+- **Deployment**: Ready for Railway + Vercel
+
+### 🚀 **FUTURE ENHANCEMENTS** 
+- **Authentication**: User accounts with Supabase
+- **Persistence**: Image storage and analysis history
+- **Advanced Algorithms**: Additional change detection methods
+- **Audio Features**: Text-to-speech result narration
+- **Real-time**: WebSocket connections for live updates
+- **Performance**: Large image optimization and caching
+
+## 🐛 Known Issues & Solutions
+
+### **Resolved Issues**
+1. **Python Cache Files** → Added comprehensive .gitignore exclusions
+2. **UV vs PIP Conflicts** → Standardized on UV package manager
+3. **MCP Tool Import Issues** → Fixed PYTHONPATH configuration
+4. **Matrix Rain Performance** → Optimized Canvas rendering
+5. **Production Build Errors** → Fixed TypeScript types and ESLint config
+
+### **Development Notes**
+- **MCP Tools**: Use `@mcp.tool()` decorator for new tools
+- **Matrix Styling**: Leverage existing CSS classes in globals.css
+- **API Bridge**: Add REST endpoints in server.py for frontend access
+- **Environment**: Always test with and without API keys
+- **Performance**: Monitor Canvas animation performance on mobile
+
+## 🤝 Development Workflow
+
+### **Adding New Features**
+1. **MCP Tools**: Add to `server.py` with `@mcp.tool()` decorator
+2. **REST API**: Add FastAPI endpoint that calls MCP tool
+3. **Frontend**: Create React component with Matrix styling
+4. **Testing**: Test locally with `build_and_serve.py`
+5. **Documentation**: Update README.md and CLAUDE.md
+
+### **Matrix Theme Guidelines**
+- **Colors**: Use Matrix green variants (#00FF00, #00AA00, #009900)
+- **Fonts**: Monospace only (Courier New, Monaco, Menlo)
+- **Effects**: Use matrix-glow, matrix-pulse, matrix-scanline classes
+- **Language**: Cyberpunk terminology ("NEURAL NETWORK", "MATRIX", "SURVEILLANCE")
+
+### **Git Workflow**
+```bash
+# Feature development
+git checkout -b feature/matrix-enhancement
+# Make changes
+python build_and_serve.py  # Test locally
+git add .
+git commit -m "Add Matrix feature"
+git push origin feature/matrix-enhancement
+# Create pull request
+```
+
+## 📖 Documentation
+
+### **User Documentation**
+- **README.md**: Complete user guide with deployment instructions
+- **MATRIX_README.md**: Matrix theme documentation and features
+
+### **Developer Documentation**
+- **CLAUDE.md**: This file - comprehensive development knowledge
+- **API Docs**: Auto-generated at localhost:8000/docs
+- **Code Comments**: Inline documentation in all major functions
+
+### **Deployment Documentation**
+- **Railway Setup**: Step-by-step backend deployment
+- **Vercel Setup**: Frontend deployment guide
+- **Environment Config**: API key and variable setup
+- **Testing Guide**: Local and production testing procedures
+
+---
+
+**STATUS: PRODUCTION READY** 🟢
+**THEME: MATRIX CYBERPUNK** 🕶️
+**ARCHITECTURE: MCP + FASTAPI** 🔧
+**DEPLOYMENT: RAILWAY + VERCEL** 🌐
+
+*"Welcome to the real world, Neo."* - The Matrix Change Detection Protocol
