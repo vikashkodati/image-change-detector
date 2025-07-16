@@ -10,7 +10,6 @@ from pathlib import Path
 import cv2
 import numpy as np
 from PIL import Image
-import rasterio
 from fastmcp import FastMCP
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -22,8 +21,19 @@ from dotenv import load_dotenv
 # Load environment variables
 load_dotenv()
 
-# Initialize OpenAI client
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+# Initialize OpenAI client with error handling
+try:
+    api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key:
+        print("⚠️  Warning: OPENAI_API_KEY not set. AI analysis features will be disabled.")
+        client = None
+    else:
+        client = OpenAI(api_key=api_key)
+        print("✅ OpenAI client initialized successfully")
+except Exception as e:
+    print(f"⚠️  Warning: Failed to initialize OpenAI client: {e}")
+    print("   AI analysis features will be disabled.")
+    client = None
 
 # Initialize FastMCP server
 mcp = FastMCP("Image Change Detector Server")
@@ -119,6 +129,12 @@ def create_fastapi_with_mcp():
             ]
             
             # Call GPT-4 Vision
+            if client is None:
+                return {
+                    "success": False,
+                    "error": "OpenAI client not available. Please set OPENAI_API_KEY environment variable."
+                }
+            
             response = client.chat.completions.create(
                 model="gpt-4o",
                 messages=messages,
@@ -341,6 +357,12 @@ async def analyze_changes_with_ai(
         ]
         
         # Call GPT-4 Vision
+        if client is None:
+            return {
+                "success": False,
+                "error": "OpenAI client not available. Please set OPENAI_API_KEY environment variable."
+            }
+        
         response = client.chat.completions.create(
             model="gpt-4o",
             messages=messages,
@@ -413,6 +435,12 @@ async def answer_question_about_changes(
         ]
         
         # Call GPT-4 Vision
+        if client is None:
+            return {
+                "success": False,
+                "error": "OpenAI client not available. Please set OPENAI_API_KEY environment variable."
+            }
+        
         response = client.chat.completions.create(
             model="gpt-4o",
             messages=messages,
@@ -445,8 +473,14 @@ async def health_check() -> Dict[str, Any]:
     }
 
 if __name__ == "__main__":
+    print("🚀 Starting Matrix Change Detector Server...")
+    print(f"🔧 Python path: {os.environ.get('PYTHONPATH', 'Not set')}")
+    print(f"🔑 OpenAI API key: {'Set' if os.getenv('OPENAI_API_KEY') else 'Not set'}")
+    
     # Create FastAPI app that uses MCP tools
+    print("📱 Creating FastAPI app with MCP tools...")
     app = create_fastapi_with_mcp()
+    print("✅ FastAPI app created successfully")
     
     # Run the server
     import uvicorn
@@ -455,6 +489,7 @@ if __name__ == "__main__":
     port = int(os.getenv("PORT", 8000))
     host = "0.0.0.0"  # Bind to all interfaces for production
     
+    print(f"🌐 Starting server on {host}:{port}")
     uvicorn.run(app, host=host, port=port)
     
     # Note: The MCP tools are available and can be used by MCP clients
