@@ -4,7 +4,7 @@ FROM python:3.11-slim
 # Set working directory
 WORKDIR /app
 
-# Install system dependencies
+# Install system dependencies for OpenCV
 RUN apt-get update && apt-get install -y \
     libgl1-mesa-glx \
     libglib2.0-0 \
@@ -15,18 +15,23 @@ RUN apt-get update && apt-get install -y \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Install UV
+# Install UV package manager
 RUN pip install uv
 
-# Copy pyproject.toml and uv.lock first for better caching
+# Copy dependency files first for better Docker layer caching
 COPY pyproject.toml uv.lock ./
 
-# Install dependencies
+# Install Python dependencies
 RUN uv sync --frozen
 
 # Copy source code
 COPY src/ ./src/
-COPY .env .env
+
+# Copy environment file if it exists (optional)
+COPY .env* ./
+
+# Set Python path
+ENV PYTHONPATH=/app/src
 
 # Expose port
 EXPOSE 8000
@@ -35,5 +40,5 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
   CMD curl -f http://localhost:8000/api/health || exit 1
 
-# Run the application
+# Run the application using UV
 CMD ["uv", "run", "python", "src/change_detector/server.py"] 
