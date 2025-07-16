@@ -1,3 +1,6 @@
+# Railway Configuration for Matrix Change Detector
+# Force Docker build - ignore Nixpacks auto-detection
+
 [build]
 builder = "DOCKERFILE"
 dockerfilePath = "backend/Dockerfile"
