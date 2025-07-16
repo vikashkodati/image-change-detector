@@ -162,7 +162,7 @@ export default function Home() {
           <Card className="matrix-card matrix-glow">
             <CardHeader className="matrix-scanline">
               <CardTitle className="matrix-text text-2xl font-mono">
-                >> UPLOAD SURVEILLANCE DATA
+                {'>>'} UPLOAD SURVEILLANCE DATA
               </CardTitle>
               <CardDescription className="matrix-text opacity-70">
                 Insert satellite imagery for deep analysis via MCP neural network
@@ -259,7 +259,7 @@ export default function Home() {
           <Card className="matrix-card matrix-glow">
             <CardHeader className="matrix-scanline">
               <CardTitle className="matrix-text text-2xl font-mono">
-                >> ANALYSIS RESULTS
+                {'>>'} ANALYSIS RESULTS
               </CardTitle>
               <CardDescription className="matrix-text opacity-70">
                 MCP neural network output and change detection matrix
