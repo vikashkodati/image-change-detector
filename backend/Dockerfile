@@ -19,19 +19,22 @@ RUN apt-get update && apt-get install -y \
 RUN pip install uv
 
 # Copy dependency files first for better Docker layer caching
-COPY pyproject.toml uv.lock ./
+COPY backend/pyproject.toml backend/uv.lock ./backend/
+
+# Change to backend directory for UV operations
+WORKDIR /app/backend
 
 # Install Python dependencies
 RUN uv sync --frozen
 
 # Copy source code
-COPY src/ ./src/
+COPY backend/src/ ./src/
 
 # Copy environment file if it exists (optional)
-COPY .env* ./
+COPY backend/.env* ./
 
-# Set Python path
-ENV PYTHONPATH=/app/src
+# Set Python path to include backend source
+ENV PYTHONPATH=/app/backend/src
 
 # Expose port
 EXPOSE 8000

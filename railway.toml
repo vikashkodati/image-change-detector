@@ -1,10 +1,9 @@
 # Railway Configuration for Matrix Change Detector
-# Force Docker build - ignore Nixpacks auto-detection
+# Build from root directory with explicit backend paths
 
 [build]
 builder = "DOCKERFILE"
 dockerfilePath = "backend/Dockerfile"
-buildContext = "backend"
 
 [deploy]
 startCommand = "uv run python src/change_detector/server.py"
@@ -14,4 +13,4 @@ restartPolicyType = "ON_FAILURE"
 
 [env]
 PORT = "8000"
-PYTHONPATH = "/app/src" 
+PYTHONPATH = "/app/backend/src" 
