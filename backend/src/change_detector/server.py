@@ -12,6 +12,7 @@ import numpy as np
 from PIL import Image
 import rasterio
 from fastmcp import FastMCP
+from fastapi.middleware.cors import CORSMiddleware
 from openai import OpenAI
 from dotenv import load_dotenv
 
@@ -23,6 +24,15 @@ client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 # Initialize FastMCP server
 mcp = FastMCP("Image Change Detector Server")
+
+# Add CORS middleware
+mcp.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 class ChangeDetector:
     """Core change detection logic"""
