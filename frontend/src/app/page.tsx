@@ -101,18 +101,15 @@ export default function Home() {
       const beforeBase64 = await fileToBase64(beforeImage);
       const afterBase64 = await fileToBase64(afterImage);
       
-      // Call FastMCP server to detect changes
-      const response = await fetch('http://127.0.0.1:8000/mcp/call', {
+      // Call REST API server to detect changes
+      const response = await fetch('http://127.0.0.1:8000/api/detect-changes', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          method: 'detect_image_changes',
-          params: {
-            before_image_base64: beforeBase64,
-            after_image_base64: afterBase64
-          }
+          before_image_base64: beforeBase64,
+          after_image_base64: afterBase64
         })
       });
       
@@ -121,6 +118,11 @@ export default function Home() {
       }
       
       const data = await response.json();
+      
+      // Handle REST API response format
+      if (!data.success) {
+        throw new Error(data.error || 'API call failed');
+      }
       setResults(data);
       
     } catch (error) {
