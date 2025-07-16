@@ -103,9 +103,13 @@ def start_backend():
     os.chdir(backend_dir)
     
     # Start the main FastMCP server using UV to ensure dependencies are available
+    # Set PYTHONPATH to ensure the module can be found
+    env = os.environ.copy()
+    env["PYTHONPATH"] = str(Path("src").absolute())
+    
     process = subprocess.Popen([
-        "uv", "run", "python", "src/change_detector/server.py"
-    ])
+        "uv", "run", "python", "-m", "change_detector.server"
+    ], env=env)
     
     os.chdir("..")
     return process

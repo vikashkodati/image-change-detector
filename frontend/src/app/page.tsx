@@ -5,12 +5,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import MatrixRain from "@/components/MatrixRain";
 
 // Sample high-resolution disaster imagery
 const sampleImages = [
   {
     id: 1,
-    name: "Hurricane Ian - Florida Power Grid",
+    name: "Hurricane Ian - Power Grid Analysis",
     before: "/samples/hurricane_ian_before.png",
     after: "/samples/hurricane_ian_after.png",
     description: "Hurricane Ian impact on Florida's power grid - nighttime lights before/after (NASA, 2022)",
@@ -18,9 +19,9 @@ const sampleImages = [
   },
   {
     id: 2,
-    name: "Los Angeles Wildfires",
+    name: "Los Angeles Wildfires Surveillance",
     before: "/samples/la_wildfire_current.jpg",
-    after: "/samples/la_wildfire_current.jpg", // Same image for now
+    after: "/samples/la_wildfire_current.jpg",
     description: "Los Angeles wildfire smoke captured by Sentinel-2 (ESA, January 2025)",
     resolution: "Sentinel-2 10m resolution"
   }
@@ -30,8 +31,21 @@ export default function Home() {
   const [beforeImage, setBeforeImage] = useState<File | null>(null);
   const [afterImage, setAfterImage] = useState<File | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [results, setResults] = useState<any>(null);
+  const [results, setResults] = useState<{
+    success: boolean;
+    results?: {
+      change_percentage: number;
+      changed_pixels: number;
+      total_pixels: number;
+      change_mask_base64: string;
+      contours_count: number;
+    };
+    error?: string;
+  } | null>(null);
   const [selectedSample, setSelectedSample] = useState<number | null>(null);
+
+  // API URL for both local and production
+  const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
 
   // Convert File to base64 string
   const fileToBase64 = (file: File): Promise<string> => {
@@ -40,334 +54,299 @@ export default function Home() {
       reader.readAsDataURL(file);
       reader.onload = () => {
         const result = reader.result as string;
-        // Remove data URL prefix (data:image/jpeg;base64,)
         const base64 = result.split(',')[1];
         resolve(base64);
       };
-      reader.onerror = error => reject(error);
+      reader.onerror = (error) => reject(error);
     });
   };
 
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>, type: 'before' | 'after') => {
-    const file = event.target.files?.[0];
-    if (file) {
-      if (type === 'before') {
-        setBeforeImage(file);
-      } else {
-        setAfterImage(file);
-      }
-      // Clear selected sample when user uploads their own files
-      setSelectedSample(null);
-    }
-  };
-
-  // Convert URL to File object
-  const urlToFile = async (url: string, filename: string): Promise<File> => {
-    const response = await fetch(url);
-    const blob = await response.blob();
-    return new File([blob], filename, { type: blob.type });
-  };
-
-  const handleSampleSelect = async (sample: typeof sampleImages[0]) => {
-    try {
-      setIsProcessing(true);
-      
-      // Convert sample images to File objects
-      const beforeFile = await urlToFile(sample.before, `${sample.name}_before`);
-      const afterFile = await urlToFile(sample.after, `${sample.name}_after`);
-      
-      setBeforeImage(beforeFile);
-      setAfterImage(afterFile);
-      setSelectedSample(sample.id);
-      setResults(null); // Clear previous results
-    } catch (error) {
-      console.error('Error loading sample images:', error);
-      alert('Failed to load sample images');
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
-  const handleAnalyze = async () => {
+  const handleDetectChanges = async () => {
     if (!beforeImage || !afterImage) {
-      alert('Please upload both before and after images');
+      alert("Please select both before and after images.");
       return;
     }
-    
+
     setIsProcessing(true);
-    
+    setResults(null);
+
     try {
-      // Convert images to base64
       const beforeBase64 = await fileToBase64(beforeImage);
       const afterBase64 = await fileToBase64(afterImage);
-      
-      // Call REST API server to detect changes
-      const response = await fetch('http://127.0.0.1:8000/api/detect-changes', {
+
+      const response = await fetch(`${API_URL}/api/detect-changes`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           before_image_base64: beforeBase64,
-          after_image_base64: afterBase64
-        })
+          after_image_base64: afterBase64,
+        }),
       });
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      
+
       const data = await response.json();
-      
-      // Handle REST API response format
-      if (!data.success) {
-        throw new Error(data.error || 'API call failed');
-      }
       setResults(data);
-      
     } catch (error) {
-      console.error('Error analyzing images:', error);
-      alert('Failed to analyze images. Please try again.');
+      console.error('Error:', error);
+      setResults({
+        success: false,
+        error: 'Failed to process images. Please check your connection and try again.'
+      });
     } finally {
       setIsProcessing(false);
     }
   };
 
+  const loadSampleImages = async (sample: typeof sampleImages[0]) => {
+    setSelectedSample(sample.id);
+    
+    try {
+      // Convert URLs to File objects
+      const beforeResponse = await fetch(sample.before);
+      const beforeBlob = await beforeResponse.blob();
+      const beforeFile = new File([beforeBlob], `${sample.name}_before.png`, { type: 'image/png' });
+
+      const afterResponse = await fetch(sample.after);
+      const afterBlob = await afterResponse.blob();
+      const afterFile = new File([afterBlob], `${sample.name}_after.png`, { type: 'image/png' });
+
+      setBeforeImage(beforeFile);
+      setAfterImage(afterFile);
+    } catch (error) {
+      console.error('Error loading sample images:', error);
+    }
+  };
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-violet-900 p-8">
-      <div className="max-w-6xl mx-auto">
-        {/* MCP Status Banner */}
-        <div className="mb-6 bg-gradient-to-r from-green-500/20 to-emerald-500/20 border border-green-500/30 rounded-lg p-4">
-          <div className="flex items-center justify-center space-x-2">
-            <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-            <span className="text-green-300 font-medium">
-              🚀 MCP-Powered Backend Active - FastMCP Tools Available
-            </span>
-            <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+    <div className="min-h-screen relative overflow-hidden">
+      {/* Matrix Rain Background */}
+      <MatrixRain />
+      
+      {/* Matrix-themed UI */}
+      <div className="relative z-10 p-6">
+        {/* Header with glitch effect */}
+        <div className="text-center mb-8">
+          <h1 
+            className="matrix-glitch text-6xl font-bold mb-4 matrix-text"
+            data-text="MATRIX CHANGE DETECTOR"
+          >
+            MATRIX CHANGE DETECTOR
+          </h1>
+          <div className="matrix-scanline">
+            <p className="text-xl matrix-text opacity-80">
+              🕶️ MCP-POWERED SATELLITE IMAGE ANALYSIS SYSTEM 🕶️
+            </p>
           </div>
         </div>
 
-        <div className="text-center mb-12">
-          <h1 className="text-6xl font-bold bg-gradient-to-r from-white via-purple-100 to-violet-100 bg-clip-text text-transparent mb-4">
-            Image Change Detector
-          </h1>
-          <p className="text-xl text-gray-300 max-w-2xl mx-auto leading-relaxed">
-            AI-powered satellite image analysis using OpenCV computer vision and GPT-4 Vision. 
-            Detect changes, analyze impacts, and get instant insights.
-          </p>
+        {/* MCP Status Banner */}
+        <div className="matrix-card matrix-glow p-4 mb-8 rounded-lg matrix-scanline">
+          <div className="flex items-center justify-center space-x-4">
+            <div className="matrix-pulse">
+              <div className="w-3 h-3 bg-green-400 rounded-full"></div>
+            </div>
+            <span className="matrix-text font-mono text-lg">
+              [SYSTEM STATUS: CONNECTED TO MATRIX] • MCP TOOLS: ACTIVE • GPT-4 VISION: ENABLED
+            </span>
+            <div className="matrix-pulse">
+              <div className="w-3 h-3 bg-green-400 rounded-full"></div>
+            </div>
+          </div>
         </div>
 
-        <Card className="mb-8 bg-gray-800/50 border-gray-700/50 backdrop-blur-sm">
-          <CardHeader>
-            <CardTitle className="text-white text-2xl font-bold">Upload Images</CardTitle>
-            <CardDescription className="text-gray-300 text-lg">
-              Select before and after satellite images to compare with AI-powered analysis
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-2">
-                <Label htmlFor="before-image" className="text-gray-200 font-medium">Before Image</Label>
-                <Input
-                  id="before-image"
-                  type="file"
-                  accept="image/*,.tiff,.tif,.geotiff"
-                  onChange={(e) => handleFileUpload(e, 'before')}
-                  className="bg-gray-700/50 border-gray-600 text-gray-200 file:bg-purple-600 file:text-white file:border-0 file:rounded-md"
-                />
-                {beforeImage && (
-                  <p className="text-sm text-green-400 flex items-center">
-                    <span className="w-2 h-2 bg-green-400 rounded-full mr-2"></span>
-                    {beforeImage.name} uploaded
-                  </p>
-                )}
+        {/* Main Content Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          
+          {/* Left Panel: Upload Interface */}
+          <Card className="matrix-card matrix-glow">
+            <CardHeader className="matrix-scanline">
+              <CardTitle className="matrix-text text-2xl font-mono">
+                >> UPLOAD SURVEILLANCE DATA
+              </CardTitle>
+              <CardDescription className="matrix-text opacity-70">
+                Insert satellite imagery for deep analysis via MCP neural network
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* Sample Data Section */}
+              <div>
+                <Label className="matrix-text text-lg font-mono block mb-4">
+                  &gt; CLASSIFIED SAMPLE DATA:
+                </Label>
+                <div className="grid gap-4">
+                  {sampleImages.map((sample) => (
+                    <div
+                      key={sample.id}
+                      className={`p-4 rounded-lg border-2 cursor-pointer transition-all duration-300 ${
+                        selectedSample === sample.id
+                          ? 'matrix-glow border-green-400 bg-green-900/20'
+                          : 'matrix-border hover:border-green-400 hover:bg-green-900/10'
+                      }`}
+                      onClick={() => loadSampleImages(sample)}
+                    >
+                      <h3 className="matrix-text font-mono font-bold text-lg mb-2">
+                        {sample.name}
+                      </h3>
+                      <p className="matrix-text opacity-70 text-sm mb-2">
+                        {sample.description}
+                      </p>
+                      <p className="matrix-text opacity-50 text-xs font-mono">
+                        RES: {sample.resolution}
+                      </p>
+                    </div>
+                  ))}
+                </div>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="after-image" className="text-gray-200 font-medium">After Image</Label>
-                <Input
-                  id="after-image"
-                  type="file"
-                  accept="image/*,.tiff,.tif,.geotiff"
-                  onChange={(e) => handleFileUpload(e, 'after')}
-                  className="bg-gray-700/50 border-gray-600 text-gray-200 file:bg-purple-600 file:text-white file:border-0 file:rounded-md"
-                />
-                {afterImage && (
-                  <p className="text-sm text-green-400 flex items-center">
-                    <span className="w-2 h-2 bg-green-400 rounded-full mr-2"></span>
-                    {afterImage.name} uploaded
-                  </p>
-                )}
-              </div>
-            </div>
+              {/* File Upload Section */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="before-image" className="matrix-text font-mono">
+                    &gt; BEFORE IMAGE:
+                  </Label>
+                  <Input
+                    id="before-image"
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => setBeforeImage(e.target.files?.[0] || null)}
+                    className="matrix-border matrix-text bg-black border-green-400 file:matrix-button file:border-green-400 file:text-green-400"
+                  />
+                  {beforeImage && (
+                    <p className="matrix-text text-sm mt-2 opacity-70">
+                      ✓ {beforeImage.name}
+                    </p>
+                  )}
+                </div>
 
-            <div className="mt-8 text-center">
-              <Button 
-                onClick={handleAnalyze}
+                <div>
+                  <Label htmlFor="after-image" className="matrix-text font-mono">
+                    &gt; AFTER IMAGE:
+                  </Label>
+                  <Input
+                    id="after-image"
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => setAfterImage(e.target.files?.[0] || null)}
+                    className="matrix-border matrix-text bg-black border-green-400 file:matrix-button file:border-green-400 file:text-green-400"
+                  />
+                  {afterImage && (
+                    <p className="matrix-text text-sm mt-2 opacity-70">
+                      ✓ {afterImage.name}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              {/* Execute Button */}
+              <Button
+                onClick={handleDetectChanges}
                 disabled={!beforeImage || !afterImage || isProcessing}
-                className="px-12 py-4 text-lg font-bold bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700 border-0 rounded-xl shadow-lg transform transition-all duration-200 hover:scale-105"
+                className="w-full matrix-button text-xl py-6 font-mono font-bold tracking-wider"
               >
                 {isProcessing ? (
-                  <span className="flex items-center">
-                    <div className="animate-spin w-5 h-5 border-2 border-white border-t-transparent rounded-full mr-3"></div>
-                    Analyzing with AI...
+                  <span className="matrix-pulse">
+                    &gt; ANALYZING... NEURAL NETWORK PROCESSING &lt;
                   </span>
                 ) : (
-                  <span className="flex items-center">
-                    🔍 Analyze Changes with MCP
-                  </span>
+                  "&gt; EXECUTE MCP ANALYSIS &lt;"
                 )}
               </Button>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
 
-        {/* Sample Images Section */}
-        <Card className="mb-8 bg-gray-800/50 border-gray-700/50 backdrop-blur-sm">
-          <CardHeader>
-            <CardTitle className="text-white text-2xl font-bold">Sample Disaster Imagery</CardTitle>
-            <CardDescription className="text-gray-300 text-lg">
-              Try the app with high-resolution satellite images from real disasters
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {sampleImages.map((sample) => (
-                <div
-                  key={sample.id}
-                  className={`border rounded-xl p-6 cursor-pointer transition-all duration-300 ${
-                    selectedSample === sample.id
-                      ? 'border-purple-500 bg-gradient-to-br from-purple-500/20 to-violet-500/20 shadow-lg transform scale-105'
-                      : 'border-gray-600 bg-gray-700/30 hover:border-purple-400 hover:bg-gray-700/50 hover:shadow-md'
-                  }`}
-                  onClick={() => handleSampleSelect(sample)}
-                >
-                  <div className="flex items-center justify-between mb-3">
-                    <h3 className="font-bold text-white text-base">{sample.name}</h3>
-                    {selectedSample === sample.id && (
-                      <span className="text-xs bg-gradient-to-r from-purple-500 to-violet-500 text-white px-3 py-1 rounded-full font-medium">
-                        ✓ Selected
-                      </span>
-                    )}
+          {/* Right Panel: Results */}
+          <Card className="matrix-card matrix-glow">
+            <CardHeader className="matrix-scanline">
+              <CardTitle className="matrix-text text-2xl font-mono">
+                >> ANALYSIS RESULTS
+              </CardTitle>
+              <CardDescription className="matrix-text opacity-70">
+                MCP neural network output and change detection matrix
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {results ? (
+                <div className="space-y-6">
+                  {results.success && results.results ? (
+                    <>
+                      {/* Analysis Stats */}
+                      <div className="matrix-border p-4 rounded-lg bg-green-900/10">
+                        <h3 className="matrix-text text-xl font-mono mb-4">
+                          [CHANGE DETECTION MATRIX]
+                        </h3>
+                        <div className="grid grid-cols-2 gap-4 text-center">
+                          <div className="matrix-border p-3 rounded bg-black/50">
+                            <div className="matrix-text text-3xl font-bold matrix-pulse">
+                              {results.results.change_percentage.toFixed(2)}%
+                            </div>
+                            <div className="matrix-text text-sm opacity-70">CHANGE RATE</div>
+                          </div>
+                          <div className="matrix-border p-3 rounded bg-black/50">
+                            <div className="matrix-text text-3xl font-bold matrix-pulse">
+                              {results.results.contours_count}
+                            </div>
+                            <div className="matrix-text text-sm opacity-70">ANOMALIES</div>
+                          </div>
+                        </div>
+                        
+                        <div className="mt-4 matrix-border p-3 rounded bg-black/50">
+                          <div className="matrix-text text-lg font-mono">
+                            PIXELS ALTERED: {results.results.changed_pixels.toLocaleString()} / {results.results.total_pixels.toLocaleString()}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Change Mask Visualization */}
+                      {results.results.change_mask_base64 && (
+                        <div className="matrix-border p-4 rounded-lg bg-green-900/10">
+                          <h3 className="matrix-text text-xl font-mono mb-4">
+                            [CHANGE MASK OVERLAY]
+                          </h3>
+                          <div className="matrix-border rounded-lg overflow-hidden matrix-glow">
+                            <img
+                              src={`data:image/png;base64,${results.results.change_mask_base64}`}
+                              alt="Change Detection Mask"
+                              className="w-full h-auto"
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <div className="matrix-border p-6 rounded-lg bg-red-900/20 border-red-400">
+                      <h3 className="matrix-text text-xl font-mono mb-2 text-red-400">
+                        [SYSTEM ERROR]
+                      </h3>
+                      <p className="matrix-text text-red-300">
+                        {results.error || "Unknown error occurred during neural network processing"}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="text-center py-12">
+                  <div className="matrix-text opacity-50 text-xl font-mono">
+                    &gt; AWAITING INPUT DATA
                   </div>
-                  <p className="text-sm text-gray-300 mb-3 leading-relaxed">{sample.description}</p>
-                  <p className="text-xs text-gray-400 font-medium">{sample.resolution}</p>
-                  
-                  {/* Image preview */}
-                  <div className="mt-3 flex space-x-2">
-                    <div className="flex-1">
-                      <img
-                        src={sample.before}
-                        alt={`${sample.name} before`}
-                        className="w-full h-24 object-cover rounded-lg border border-gray-600"
-                      />
-                      <p className="text-xs text-center mt-2 text-gray-300 font-medium">Before</p>
-                    </div>
-                    <div className="flex-1">
-                      <img
-                        src={sample.after}
-                        alt={`${sample.name} after`}
-                        className="w-full h-24 object-cover rounded-lg border border-gray-600"
-                      />
-                      <p className="text-xs text-center mt-2 text-gray-300 font-medium">After</p>
-                    </div>
+                  <div className="matrix-text opacity-30 text-sm mt-4 font-mono">
+                    Upload surveillance imagery to begin MCP analysis...
                   </div>
                 </div>
-              ))}
-            </div>
-            
-            {selectedSample && (
-              <div className="mt-6 p-4 bg-gradient-to-r from-green-500/20 to-emerald-500/20 border border-green-500/30 rounded-xl">
-                <p className="text-sm text-green-300 flex items-center justify-center">
-                  <span className="w-2 h-2 bg-green-400 rounded-full mr-2 animate-pulse"></span>
-                  Sample images loaded! Click "Analyze Changes with MCP" to see AI-powered results.
-                </p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+              )}
+            </CardContent>
+          </Card>
+        </div>
 
-        <Card className="bg-gray-800/50 border-gray-700/50 backdrop-blur-sm">
-          <CardHeader>
-            <CardTitle className="text-white text-2xl font-bold">AI Analysis Results</CardTitle>
-            <CardDescription className="text-gray-300 text-lg">
-              OpenCV change detection + GPT-4 Vision insights powered by MCP
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {!results ? (
-              <div className="text-center text-gray-400 py-12">
-                <div className="text-6xl mb-4">🛰️</div>
-                <p className="text-lg">Upload and analyze images to see AI-powered results</p>
-                <p className="text-sm text-gray-500 mt-2">MCP tools ready for change detection</p>
-              </div>
-            ) : (
-              <div className="space-y-6">
-                {results.success ? (
-                  <>
-                    {/* Change Statistics */}
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-                      <div className="text-center p-6 bg-gradient-to-br from-blue-500/20 to-blue-600/20 border border-blue-500/30 rounded-xl">
-                        <div className="text-3xl font-bold text-blue-300 mb-2">
-                          {results.results.change_percentage}%
-                        </div>
-                        <div className="text-sm text-gray-300 font-medium">Change Detected</div>
-                      </div>
-                      <div className="text-center p-6 bg-gradient-to-br from-green-500/20 to-green-600/20 border border-green-500/30 rounded-xl">
-                        <div className="text-3xl font-bold text-green-300 mb-2">
-                          {results.results.changed_pixels.toLocaleString()}
-                        </div>
-                        <div className="text-sm text-gray-300 font-medium">Pixels Changed</div>
-                      </div>
-                      <div className="text-center p-6 bg-gradient-to-br from-purple-500/20 to-purple-600/20 border border-purple-500/30 rounded-xl">
-                        <div className="text-3xl font-bold text-purple-300 mb-2">
-                          {results.results.total_pixels.toLocaleString()}
-                        </div>
-                        <div className="text-sm text-gray-300 font-medium">Total Pixels</div>
-                      </div>
-                      <div className="text-center p-6 bg-gradient-to-br from-orange-500/20 to-orange-600/20 border border-orange-500/30 rounded-xl">
-                        <div className="text-3xl font-bold text-orange-300 mb-2">
-                          {results.results.contours_count}
-                        </div>
-                        <div className="text-sm text-gray-300 font-medium">Change Regions</div>
-                      </div>
-                    </div>
-
-                    {/* Change Mask Visualization */}
-                    {results.results.change_mask_base64 && (
-                      <div className="space-y-6">
-                        <h3 className="text-xl font-bold text-white">🎯 AI Change Detection Overlay</h3>
-                        <div className="flex justify-center bg-gray-900/50 rounded-xl p-6 border border-gray-600">
-                          <img 
-                            src={`data:image/png;base64,${results.results.change_mask_base64}`}
-                            alt="Change detection overlay"
-                            className="max-w-full h-auto border-2 border-purple-500/30 rounded-lg shadow-2xl"
-                          />
-                        </div>
-                        <div className="text-center p-4 bg-gradient-to-r from-green-500/20 to-emerald-500/20 border border-green-500/30 rounded-lg">
-                          <p className="text-sm text-green-300 flex items-center justify-center">
-                            <span className="mr-2">🟢</span>
-                            Green areas highlight detected changes using OpenCV algorithms
-                            <span className="ml-2">🟢</span>
-                          </p>
-                        </div>
-                      </div>
-                    )}
-                  </>
-                ) : (
-                  <div className="text-center py-12">
-                    <div className="text-6xl mb-4">⚠️</div>
-                    <div className="p-6 bg-gradient-to-r from-red-500/20 to-red-600/20 border border-red-500/30 rounded-xl">
-                      <p className="text-red-300 text-lg font-medium">Analysis failed</p>
-                      <p className="text-red-400 text-sm mt-2">{results.error}</p>
-                      <p className="text-gray-400 text-xs mt-3">MCP backend error - please try again</p>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+        {/* Footer */}
+        <div className="text-center mt-12">
+          <div className="matrix-text opacity-50 font-mono text-sm">
+            POWERED BY: OpenCV Neural Networks • GPT-4 Vision AI • MCP Protocol v2.0 • FastAPI Matrix Interface
+          </div>
+          <div className="matrix-text opacity-30 font-mono text-xs mt-2">
+            "There is no spoon. Only data." - The Matrix Change Detection Protocol
+          </div>
+        </div>
       </div>
     </div>
   );

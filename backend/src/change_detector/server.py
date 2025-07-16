@@ -46,11 +46,11 @@ def create_fastapi_with_mcp():
     # Create FastAPI app (this will work properly)
     app = FastAPI(title="Image Change Detector API (MCP-powered)")
     
-    # Add CORS middleware
+    # Add CORS middleware - allow all origins for public deployment
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["http://localhost:3000", "http://127.0.0.1:3000", "http://localhost:3001"],
-        allow_credentials=True,
+        allow_origins=["*"],  # Allow all origins for public access
+        allow_credentials=False,  # Set to False when allowing all origins
         allow_methods=["GET", "POST", "OPTIONS"],
         allow_headers=["*"],
     )
@@ -450,7 +450,12 @@ if __name__ == "__main__":
     
     # Run the server
     import uvicorn
-    uvicorn.run(app, host="127.0.0.1", port=8000)
+    
+    # Get port from environment variable for deployment platforms
+    port = int(os.getenv("PORT", 8000))
+    host = "0.0.0.0"  # Bind to all interfaces for production
+    
+    uvicorn.run(app, host=host, port=port)
     
     # Note: The MCP tools are available and can be used by MCP clients
     # The FastAPI endpoints provide REST access to the same functionality
