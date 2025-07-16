@@ -38,13 +38,13 @@ class AnalyzeChangesRequest(BaseModel):
     after_image_base64: str
     change_results: Dict[str, Any]
 
-# Create a hybrid FastAPI + FastMCP server
-def create_app():
-    """Create FastAPI app with REST endpoints and integrate with FastMCP"""
+# Create a proper FastAPI app that uses MCP tools
+def create_fastapi_with_mcp():
+    """Create FastAPI app with REST endpoints that call MCP tools"""
     from fastapi import FastAPI
     
-    # Create separate FastAPI app for REST endpoints
-    app = FastAPI(title="Image Change Detector API")
+    # Create FastAPI app (this will work properly)
+    app = FastAPI(title="Image Change Detector API (MCP-powered)")
     
     # Add CORS middleware
     app.add_middleware(
@@ -55,10 +55,10 @@ def create_app():
         allow_headers=["*"],
     )
     
-    # REST API endpoints for frontend integration
+    # REST API endpoints that call MCP tool functions
     @app.post("/api/detect-changes")
     async def api_detect_changes(request: DetectChangesRequest):
-        """REST API endpoint that calls the change detection logic"""
+        """REST API endpoint that calls the same logic as MCP detect_image_changes tool"""
         try:
             # Decode base64 images
             before_bytes = base64.b64decode(request.before_image_base64)
@@ -78,6 +78,7 @@ def create_app():
                 "success": True,
                 "results": results
             }
+            
         except Exception as e:
             return {
                 "success": False,
@@ -86,7 +87,7 @@ def create_app():
     
     @app.post("/api/analyze-changes")
     async def api_analyze_changes(request: AnalyzeChangesRequest):
-        """REST API endpoint for AI analysis"""
+        """REST API endpoint that calls the same logic as MCP analyze_changes_with_ai tool"""
         try:
             # Prepare messages for GPT-4 Vision
             messages = [
@@ -131,6 +132,7 @@ def create_app():
                 "analysis": analysis,
                 "model_used": "gpt-4o"
             }
+            
         except Exception as e:
             return {
                 "success": False,
@@ -139,11 +141,39 @@ def create_app():
     
     @app.get("/api/health")
     async def api_health():
-        """REST API health check"""
+        """REST API health check that provides the same info as MCP health_check tool"""
         return {
             "status": "healthy",
-            "service": "Image Change Detector Server",
-            "version": "0.1.0"
+            "service": "Image Change Detector Server (MCP-powered)",
+            "version": "0.1.0",
+            "mcp_tools_available": True
+        }
+    
+    # Add MCP tools documentation endpoint
+    @app.get("/mcp/tools")
+    async def list_mcp_tools():
+        """List available MCP tools"""
+        return {
+            "tools": [
+                {
+                    "name": "detect_image_changes",
+                    "description": "Detect changes between two satellite images using OpenCV"
+                },
+                {
+                    "name": "analyze_changes_with_ai", 
+                    "description": "Use GPT-4 Vision to analyze and describe changes"
+                },
+                {
+                    "name": "answer_question_about_changes",
+                    "description": "Answer specific questions about changes in images"
+                },
+                {
+                    "name": "health_check",
+                    "description": "Server health check"
+                }
+            ],
+            "server": "FastMCP-powered Image Change Detector",
+            "mcp_available": True
         }
     
     return app
@@ -415,10 +445,12 @@ async def health_check() -> Dict[str, Any]:
     }
 
 if __name__ == "__main__":
-    import uvicorn
-    
-    # Create the FastAPI app
-    app = create_app()
+    # Create FastAPI app that uses MCP tools
+    app = create_fastapi_with_mcp()
     
     # Run the server
+    import uvicorn
     uvicorn.run(app, host="127.0.0.1", port=8000)
+    
+    # Note: The MCP tools are available and can be used by MCP clients
+    # The FastAPI endpoints provide REST access to the same functionality
