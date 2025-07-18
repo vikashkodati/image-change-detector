@@ -4,7 +4,7 @@ FROM python:3.11-slim
 # Set working directory
 WORKDIR /app
 
-# Install system dependencies for OpenCV
+# Install system dependencies for OpenCV and git
 RUN apt-get update && apt-get install -y \
     libgl1-mesa-glx \
     libglib2.0-0 \
@@ -13,6 +13,7 @@ RUN apt-get update && apt-get install -y \
     libxrender-dev \
     libgomp1 \
     curl \
+    git \
     && rm -rf /var/lib/apt/lists/*
 
 # Install UV package manager
@@ -24,9 +25,13 @@ COPY backend/pyproject.toml backend/uv.lock ./backend/
 # Change to backend directory for UV operations
 WORKDIR /app/backend
 
-# Install Python dependencies (basic + AI optional)
-RUN uv sync --frozen && \
-    uv sync --frozen --extra ai || echo "⚠️  AI dependencies failed to install - will run with basic features only"
+# Install basic Python dependencies first
+RUN uv sync --frozen
+
+# Install AI dependencies separately with graceful handling
+RUN uv sync --frozen --extra ai && \
+    uv pip install "git+https://github.com/openai/CLIP.git" || \
+    echo "⚠️  CLIP installation failed - will run with OpenCV-only mode"
 
 # Copy source code
 COPY backend/src/ ./src/

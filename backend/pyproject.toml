@@ -23,8 +23,9 @@ dependencies = [
 [project.optional-dependencies]
 # Hybrid AI features - install separately for enhanced capabilities
 ai = [
-    "torch>=2.0.0",
-    "torchvision>=0.15.0", 
-    "clip-by-openai>=1.0.1",
-    "transformers>=4.30.0",
+    "torch>=2.0.0,<2.3.0",
+    "torchvision>=0.15.0,<0.18.0", 
+    "ftfy",
+    "regex",
+    # Install CLIP via git since pip package has conflicts
 ]
