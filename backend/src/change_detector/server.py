@@ -1023,6 +1023,17 @@ class CLIPSemanticAnalyzer:
                 self.initialization_error = f"Failed to import CLIP dependencies: {e}"
                 print(f"   ❌ Import failed: {e}")
                 return False
+            except Exception as e:
+                # Handle NumPy warnings as non-fatal
+                if "numpy" in str(e).lower() and "warning" in str(e).lower():
+                    print(f"   ⚠️  NumPy warning (non-fatal): {e}")
+                    import torch
+                    import clip
+                    print("   ✅ Imported torch and clip despite NumPy warnings")
+                else:
+                    self.initialization_error = f"Failed to import CLIP dependencies: {e}"
+                    print(f"   ❌ Import failed: {e}")
+                    return False
             
             # Test basic torch functionality
             try:
@@ -1033,16 +1044,38 @@ class CLIPSemanticAnalyzer:
                 print(f"   ❌ Device check failed: {e}")
                 return False
             
-            # Load CLIP model
+            # Load CLIP model with warning tolerance
             try:
                 print("   📥 Loading CLIP ViT-B/32 model...")
-                self.model, self.preprocess = clip.load("ViT-B/32", device=self.device)
-                self.model.eval()
+                
+                # Suppress NumPy warnings during model loading
+                import warnings
+                with warnings.catch_warnings():
+                    warnings.filterwarnings("ignore", category=UserWarning, message=".*NumPy.*")
+                    self.model, self.preprocess = clip.load("ViT-B/32", device=self.device)
+                    self.model.eval()
+                
                 print("   ✅ CLIP model loaded successfully")
             except Exception as e:
-                self.initialization_error = f"CLIP model loading failed: {e}"
-                print(f"   ❌ Model loading failed: {e}")
-                return False
+                # Check if it's just a NumPy warning issue
+                if "numpy" in str(e).lower() and any(keyword in str(e).lower() for keyword in ["warning", "_array_api", "failed to initialize"]):
+                    print(f"   ⚠️  NumPy compatibility warning during model load: {e}")
+                    try:
+                        # Try loading again with warnings suppressed
+                        import warnings
+                        with warnings.catch_warnings():
+                            warnings.simplefilter("ignore")
+                            self.model, self.preprocess = clip.load("ViT-B/32", device=self.device)
+                            self.model.eval()
+                        print("   ✅ CLIP model loaded successfully (warnings suppressed)")
+                    except Exception as e2:
+                        self.initialization_error = f"CLIP model loading failed even with warnings suppressed: {e2}"
+                        print(f"   ❌ Model loading failed: {e2}")
+                        return False
+                else:
+                    self.initialization_error = f"CLIP model loading failed: {e}"
+                    print(f"   ❌ Model loading failed: {e}")
+                    return False
             
             # Precompute text embeddings for change categories
             try:
@@ -1228,8 +1261,22 @@ class CLIPSemanticAnalyzer:
         else:
             return "Very different - major changes or completely different scenes"
 
-# Initialize semantic analyzer (lazy loading)
+# Initialize semantic analyzer and check CLIP availability at startup
 semantic_analyzer = CLIPSemanticAnalyzer()  # Always create, will lazy-load CLIP when needed
+
+# Force CLIP availability check at startup for frontend status
+print("🚀 Checking CLIP availability at server startup...")
+startup_clip_available = check_clip_availability()
+if startup_clip_available:
+    print("   ✅ CLIP is available for hybrid detection")
+    # Pre-initialize the model for faster first use
+    try:
+        semantic_analyzer._initialize_model()
+        print("   ✅ CLIP model pre-initialized successfully")
+    except Exception as e:
+        print(f"   ⚠️  CLIP pre-initialization failed: {e} (will try again on first use)")
+else:
+    print("   ⚠️  CLIP not available at startup - will use OpenCV-only mode")
 
 # Create the FastAPI app at module level for Railway
 app = None
