@@ -35,8 +35,9 @@ RUN echo "📥 Installing CLIP..." && \
      uv pip install clip-by-openai || \
      echo "❌ All CLIP installation methods failed - will run with OpenCV-only mode")
 
-# Verify installations
+# Verify installations with NumPy compatibility check
 RUN echo "🔍 Verifying installations..." && \
+    uv run python -c "import numpy; print(f'✅ numpy: {numpy.__version__}')" && \
     uv run python -c "import torch; print(f'✅ torch: {torch.__version__}')" && \
     uv run python -c "import torchvision; print(f'✅ torchvision: {torchvision.__version__}')" && \
     (uv run python -c "import clip; print(f'✅ CLIP: {clip.available_models()}')" || \

@@ -65,6 +65,14 @@ def check_clip_availability():
             print(f"⚠️  CLIP runtime check failed: {e}")
             print(f"   Exception type: {type(e)}")
             print(f"   Exception details: {e}")
+            
+            # Check for specific NumPy compatibility issues
+            error_str = str(e).lower()
+            if "numpy" in error_str and ("1.x" in error_str or "2.x" in error_str or "2.0" in error_str):
+                print("   🔍 DETECTED: NumPy version compatibility issue")
+                print("   💡 FIX: Update dependencies to constrain numpy<2.0.0")
+                CLIP_IMPORT_ERROR = f"NumPy compatibility issue: {str(e)}"
+            
             return False
     else:
         CLIP_AVAILABLE = False
