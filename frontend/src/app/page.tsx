@@ -342,40 +342,97 @@ export default function Home() {
               onClick={async () => {
                 try {
                   const response = await fetch(`${API_URL}/api/debug-imports`, { method: 'POST' });
+                  
+                  if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                  }
+                  
                   const data = await response.json();
+                  
+                  // Check if we got valid data
+                  if (!data || typeof data !== 'object') {
+                    throw new Error('Invalid response data from server');
+                  }
+                  
+                  // Check if the API call was successful
+                  if (data.success === false) {
+                    alert(`❌ Debug API Error: ${data.error || 'Unknown error'}`);
+                    return;
+                  }
                   
                   // Create a more readable debug report
                   let report = "🔍 CLIP IMPORT DEBUG REPORT\n";
                   report += "=" + "=".repeat(50) + "\n\n";
                   
-                  report += "📦 PACKAGE IMPORTS:\n";
-                  Object.entries(data.imports as any).forEach(([name, info]: [string, any]) => {
-                    const status = info.available ? "✅" : "❌";
-                    report += `${status} ${name}: ${info.available ? info.version : info.error}\n`;
-                  });
-                  
-                  report += "\n🧠 CLIP STATUS:\n";
-                  if (data.clip_status.import_success) {
-                    report += `✅ CLIP imported successfully\n`;
-                    report += `📋 Available models: ${data.clip_status.models?.join(', ') || 'unknown'}\n`;
+                  // Check imports section
+                  if (data.imports && typeof data.imports === 'object') {
+                    report += "📦 PACKAGE IMPORTS:\n";
+                    Object.entries(data.imports).forEach(([name, info]: [string, any]) => {
+                      try {
+                        const status = info?.available ? "✅" : "❌";
+                        const details = info?.available ? (info.version || 'unknown version') : (info?.error || 'unknown error');
+                        report += `${status} ${name}: ${details}\n`;
+                      } catch (e) {
+                        report += `❌ ${name}: Error processing info\n`;
+                      }
+                    });
                   } else {
-                    report += `❌ CLIP import failed: ${data.clip_status.error}\n`;
+                    report += "📦 PACKAGE IMPORTS: Error - no import data available\n";
                   }
                   
+                  // Check CLIP status
+                  report += "\n🧠 CLIP STATUS:\n";
+                  if (data.clip_status && typeof data.clip_status === 'object') {
+                    if (data.clip_status.import_success) {
+                      report += `✅ CLIP imported successfully\n`;
+                      if (data.clip_status.models && Array.isArray(data.clip_status.models)) {
+                        report += `📋 Available models: ${data.clip_status.models.join(', ')}\n`;
+                      }
+                    } else {
+                      report += `❌ CLIP import failed: ${data.clip_status.error || 'unknown error'}\n`;
+                    }
+                  } else {
+                    report += `❌ CLIP status data unavailable\n`;
+                  }
+                  
+                  // System info
                   report += "\n🖥️ SYSTEM INFO:\n";
-                  report += `🐍 Python: ${data.python_version.split(' ')[0]}\n`;
-                  if (data.system_info.env_vars) {
+                  if (data.python_version) {
+                    report += `🐍 Python: ${data.python_version.split(' ')[0]}\n`;
+                  }
+                  if (data.system_info?.env_vars?.PYTHONPATH) {
                     report += `📁 PYTHONPATH: ${data.system_info.env_vars.PYTHONPATH}\n`;
+                  }
+                  if (data.timestamp) {
+                    report += `⏰ Timestamp: ${data.timestamp}\n`;
                   }
                   
                   alert(report);
+                  
                 } catch (error) {
-                  alert(`Error debugging imports: ${error}`);
+                  console.error('Debug imports error:', error);
+                  alert(`❌ Error debugging imports: ${error}\n\nCheck browser console for details.`);
                 }
               }}
               className="text-xs"
             >
               🐛 DEBUG IMPORTS
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={async () => {
+                try {
+                  const response = await fetch(`${API_URL}/api/test`);
+                  const data = await response.json();
+                  alert(`✅ API Test Successful!\n\nMessage: ${data.message}\nTimestamp: ${data.timestamp}\n\nAvailable endpoints:\n${data.endpoints_available?.join('\n') || 'Unknown'}`);
+                } catch (error) {
+                  alert(`❌ API Test Failed: ${error}\n\nCheck if backend is running at: ${API_URL}`);
+                }
+              }}
+              className="text-xs"
+            >
+              🔧 TEST API
             </Button>
           </div>
         </div>

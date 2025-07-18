@@ -323,6 +323,21 @@ def create_fastapi_with_mcp():
             }
         }
     
+    @app.get("/api/test")
+    async def api_test():
+        """Simple test endpoint to verify API is working"""
+        return {
+            "message": "API is working",
+            "timestamp": str(__import__('datetime').datetime.now()),
+            "endpoints_available": [
+                "/api/health",
+                "/api/test", 
+                "/api/clip-status",
+                "/api/debug-imports",
+                "/api/detect-changes"
+            ]
+        }
+    
     @app.get("/api/clip-status")
     async def api_clip_status():
         """Detailed CLIP availability status"""
@@ -378,60 +393,87 @@ def create_fastapi_with_mcp():
     @app.post("/api/debug-imports")
     async def api_debug_imports():
         """Comprehensive import debugging for CLIP issues"""
-        debug_info = {
-            "timestamp": str(__import__('datetime').datetime.now()),
-            "python_version": __import__('sys').version,
-            "imports": {},
-            "clip_status": {},
-            "system_info": {}
-        }
-        
-        # Test individual imports
-        import_tests = [
-            ("torch", "torch"),
-            ("torchvision", "torchvision"), 
-            ("clip", "clip"),
-            ("ftfy", "ftfy"),
-            ("regex", "regex"),
-            ("PIL", "PIL"),
-            ("numpy", "numpy")
-        ]
-        
-        for name, module_name in import_tests:
-            try:
-                module = __import__(module_name)
-                debug_info["imports"][name] = {
-                    "available": True,
-                    "version": getattr(module, "__version__", "unknown"),
-                    "file": getattr(module, "__file__", "unknown")
-                }
-            except ImportError as e:
-                debug_info["imports"][name] = {
-                    "available": False,
-                    "error": str(e)
-                }
-        
-        # CLIP specific tests
         try:
-            import clip
-            debug_info["clip_status"]["models"] = clip.available_models()
-            debug_info["clip_status"]["import_success"] = True
-        except Exception as e:
-            debug_info["clip_status"]["import_success"] = False
-            debug_info["clip_status"]["error"] = str(e)
-        
-        # System info
-        try:
-            import os
-            debug_info["system_info"]["env_vars"] = {
-                "PYTHONPATH": os.environ.get("PYTHONPATH", "not set"),
-                "PATH": os.environ.get("PATH", "")[:200] + "...",  # Truncated
-                "UV_SYSTEM_PYTHON": os.environ.get("UV_SYSTEM_PYTHON", "not set")
+            debug_info = {
+                "timestamp": str(__import__('datetime').datetime.now()),
+                "python_version": __import__('sys').version,
+                "imports": {},
+                "clip_status": {},
+                "system_info": {},
+                "success": True
             }
+            
+            # Test individual imports
+            import_tests = [
+                ("torch", "torch"),
+                ("torchvision", "torchvision"), 
+                ("clip", "clip"),
+                ("ftfy", "ftfy"),
+                ("regex", "regex"),
+                ("PIL", "PIL"),
+                ("numpy", "numpy")
+            ]
+            
+            for name, module_name in import_tests:
+                try:
+                    module = __import__(module_name)
+                    debug_info["imports"][name] = {
+                        "available": True,
+                        "version": getattr(module, "__version__", "unknown"),
+                        "file": getattr(module, "__file__", "unknown")
+                    }
+                except ImportError as e:
+                    debug_info["imports"][name] = {
+                        "available": False,
+                        "error": str(e)
+                    }
+                except Exception as e:
+                    debug_info["imports"][name] = {
+                        "available": False,
+                        "error": f"Unexpected error: {str(e)}"
+                    }
+            
+            # CLIP specific tests
+            try:
+                import clip
+                debug_info["clip_status"]["models"] = clip.available_models()
+                debug_info["clip_status"]["import_success"] = True
+            except Exception as e:
+                debug_info["clip_status"]["import_success"] = False
+                debug_info["clip_status"]["error"] = str(e)
+            
+            # System info
+            try:
+                import os
+                debug_info["system_info"]["env_vars"] = {
+                    "PYTHONPATH": os.environ.get("PYTHONPATH", "not set"),
+                    "PATH": os.environ.get("PATH", "")[:200] + "...",  # Truncated
+                    "UV_SYSTEM_PYTHON": os.environ.get("UV_SYSTEM_PYTHON", "not set")
+                }
+            except Exception as e:
+                debug_info["system_info"]["error"] = str(e)
+            
+            # Add CORS headers
+            response = JSONResponse(content=debug_info)
+            response.headers["Access-Control-Allow-Origin"] = "*"
+            response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
+            response.headers["Access-Control-Allow-Headers"] = "*"
+            return response
+            
         except Exception as e:
-            debug_info["system_info"]["error"] = str(e)
-        
-        return debug_info
+            # Fallback error response
+            error_response = {
+                "success": False,
+                "error": str(e),
+                "imports": {},
+                "clip_status": {"import_success": False, "error": str(e)},
+                "system_info": {"error": str(e)}
+            }
+            response = JSONResponse(content=error_response)
+            response.headers["Access-Control-Allow-Origin"] = "*"
+            response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"  
+            response.headers["Access-Control-Allow-Headers"] = "*"
+            return response
     
     # Add MCP tools documentation endpoint
     @app.get("/mcp/tools")
