@@ -254,6 +254,41 @@ export default function Home() {
               🧠 OpenCV + CLIP Semantic Analysis • 🎯 Change Classification • ⚡ Threat Assessment
             </span>
           </div>
+          {/* CLIP Debug Panel */}
+          <div className="mt-4 flex justify-center space-x-4">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={async () => {
+                try {
+                  const response = await fetch(`${API_URL}/api/clip-status`);
+                  const data = await response.json();
+                  alert(`CLIP Status:\n${JSON.stringify(data, null, 2)}`);
+                } catch (error) {
+                  alert(`Error checking CLIP status: ${error}`);
+                }
+              }}
+              className="text-xs"
+            >
+              🔍 CHECK CLIP STATUS
+            </Button>
+            <Button
+              variant="outline" 
+              size="sm"
+              onClick={async () => {
+                try {
+                  const response = await fetch(`${API_URL}/api/force-clip-init`, { method: 'POST' });
+                  const data = await response.json();
+                  alert(`Force CLIP Init:\n${JSON.stringify(data, null, 2)}`);
+                } catch (error) {
+                  alert(`Error forcing CLIP init: ${error}`);
+                }
+              }}
+              className="text-xs"
+            >
+              🚀 FORCE CLIP INIT
+            </Button>
+          </div>
         </div>
 
         {/* Main Content Grid */}
