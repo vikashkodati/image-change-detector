@@ -278,6 +278,19 @@ class ChangeDetector:
 # Initialize change detector
 detector = ChangeDetector()
 
+# Create the FastAPI app at module level for Railway
+app = None
+
+def get_or_create_app():
+    """Get or create the FastAPI app"""
+    global app
+    if app is None:
+        app = create_fastapi_with_mcp()
+    return app
+
+# Make sure app is available at module level for Railway
+app = get_or_create_app()
+
 @mcp.tool()
 async def detect_image_changes(before_image_base64: str, after_image_base64: str) -> Dict[str, Any]:
     """
@@ -477,9 +490,8 @@ if __name__ == "__main__":
     print(f"🔧 Python path: {os.environ.get('PYTHONPATH', 'Not set')}")
     print(f"🔑 OpenAI API key: {'Set' if os.getenv('OPENAI_API_KEY') else 'Not set'}")
     
-    # Create FastAPI app that uses MCP tools
-    print("📱 Creating FastAPI app with MCP tools...")
-    app = create_fastapi_with_mcp()
+    # Use the global app
+    print("📱 Using FastAPI app with MCP tools...")
     print("✅ FastAPI app created successfully")
     
     # Run the server
