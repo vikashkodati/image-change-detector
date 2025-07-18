@@ -289,7 +289,13 @@ def get_or_create_app():
     return app
 
 # Make sure app is available at module level for Railway
-app = get_or_create_app()
+try:
+    print("🚀 Initializing FastAPI app for Railway...")
+    app = get_or_create_app()
+    print("✅ FastAPI app initialized successfully for Railway")
+except Exception as e:
+    print(f"❌ Failed to initialize FastAPI app: {e}")
+    raise
 
 @mcp.tool()
 async def detect_image_changes(before_image_base64: str, after_image_base64: str) -> Dict[str, Any]:
