@@ -233,8 +233,66 @@ def create_fastapi_with_mcp():
             "status": "healthy",
             "service": "Image Change Detector Server (MCP-powered)",
             "version": "0.1.0",
-            "mcp_tools_available": True
+            "mcp_tools_available": True,
+            "clip_status": {
+                "torch_available": TORCH_AVAILABLE,
+                "clip_available": CLIP_AVAILABLE,
+                "clip_error": CLIP_IMPORT_ERROR,
+                "semantic_analyzer_created": semantic_analyzer is not None
+            }
         }
+    
+    @app.get("/api/clip-status")
+    async def api_clip_status():
+        """Detailed CLIP availability status"""
+        # Force a fresh check
+        clip_check = check_clip_availability()
+        
+        # Try to initialize semantic analyzer if not done
+        semantic_init = False
+        semantic_error = None
+        if semantic_analyzer:
+            try:
+                semantic_init = semantic_analyzer._initialize_model()
+                semantic_error = semantic_analyzer.initialization_error
+            except Exception as e:
+                semantic_error = str(e)
+        
+        return {
+            "torch_imported_at_startup": TORCH_AVAILABLE,
+            "torch_object_available": torch is not None,
+            "clip_object_available": clip is not None,
+            "clip_availability_check": clip_check,
+            "clip_available_flag": CLIP_AVAILABLE,
+            "clip_import_error": CLIP_IMPORT_ERROR,
+            "semantic_analyzer_exists": semantic_analyzer is not None,
+            "semantic_analyzer_initialized": semantic_init,
+            "semantic_analyzer_error": semantic_error
+        }
+    
+    @app.post("/api/force-clip-init")
+    async def api_force_clip_init():
+        """Force CLIP initialization for testing"""
+        if not semantic_analyzer:
+            return {"success": False, "error": "Semantic analyzer not created"}
+        
+        try:
+            # Reset initialization state
+            semantic_analyzer.initialization_attempted = False
+            semantic_analyzer.initialization_error = None
+            
+            # Force initialization
+            success = semantic_analyzer._initialize_model()
+            
+            return {
+                "success": success,
+                "error": semantic_analyzer.initialization_error,
+                "model_loaded": semantic_analyzer.model is not None,
+                "device": getattr(semantic_analyzer, 'device', None),
+                "categories_precomputed": len(semantic_analyzer.category_embeddings) > 0
+            }
+        except Exception as e:
+            return {"success": False, "error": str(e)}
     
     # Add MCP tools documentation endpoint
     @app.get("/mcp/tools")
@@ -459,16 +517,21 @@ class ChangeDetector:
             classification_results = {}
             
             if semantic_analyzer:
+                print(f"   🧠 Semantic analyzer available, attempting analysis...")
+                
                 # Semantic similarity analysis (will handle lazy loading internally)
                 semantic_results = await semantic_analyzer.analyze_semantic_similarity(
                     before_image, after_image
                 )
+                print(f"   📊 Semantic similarity result: {semantic_results.get('available', False)}")
                 
                 # Change type classification (will handle lazy loading internally)
                 classification_results = await semantic_analyzer.classify_change_type(
                     before_image, after_image
                 )
+                print(f"   🏷️  Classification result: {classification_results.get('available', False)}")
             else:
+                print("   ❌ Semantic analyzer not initialized")
                 semantic_results = {"available": False, "error": "Semantic analyzer not initialized"}
                 classification_results = {"available": False, "error": "Semantic analyzer not initialized"}
             
@@ -650,25 +713,56 @@ class CLIPSemanticAnalyzer:
         self.initialization_attempted = True
         
         try:
-            # Check if CLIP is available first
-            if not check_clip_availability():
-                self.initialization_error = CLIP_IMPORT_ERROR or "CLIP not available"
+            print("🧠 Attempting to initialize CLIP model...")
+            
+            # Try to import torch and clip directly (don't rely on module-level imports)
+            try:
+                import torch
+                import clip
+                print("   ✅ Successfully imported torch and clip")
+            except ImportError as e:
+                self.initialization_error = f"Failed to import CLIP dependencies: {e}"
+                print(f"   ❌ Import failed: {e}")
                 return False
             
-            # Now import the heavy dependencies
-            import torch
-            import clip
+            # Test basic torch functionality
+            try:
+                self.device = "cuda" if torch.cuda.is_available() else "cpu"
+                print(f"   🖥️  Using device: {self.device}")
+            except Exception as e:
+                self.initialization_error = f"Torch device check failed: {e}"
+                print(f"   ❌ Device check failed: {e}")
+                return False
             
-            print("🧠 Initializing CLIP model for semantic analysis...")
-            self.device = "cuda" if torch.cuda.is_available() else "cpu"
-            
-            # Use smaller ViT-B/32 model for better performance
-            self.model, self.preprocess = clip.load("ViT-B/32", device=self.device)
-            self.model.eval()
+            # Load CLIP model
+            try:
+                print("   📥 Loading CLIP ViT-B/32 model...")
+                self.model, self.preprocess = clip.load("ViT-B/32", device=self.device)
+                self.model.eval()
+                print("   ✅ CLIP model loaded successfully")
+            except Exception as e:
+                self.initialization_error = f"CLIP model loading failed: {e}"
+                print(f"   ❌ Model loading failed: {e}")
+                return False
             
             # Precompute text embeddings for change categories
-            self.category_embeddings = self._precompute_category_embeddings()
-            print(f"✅ CLIP model loaded on {self.device}")
+            try:
+                print("   🔤 Precomputing category embeddings...")
+                self.category_embeddings = self._precompute_category_embeddings()
+                print(f"   ✅ Precomputed {len(self.category_embeddings)} category embeddings")
+            except Exception as e:
+                self.initialization_error = f"Category embedding failed: {e}"
+                print(f"   ⚠️  Category embedding failed: {e}")
+                # Continue without embeddings - still partially functional
+                self.category_embeddings = {}
+            
+            print(f"✅ CLIP model fully initialized on {self.device}")
+            
+            # Update global flags
+            global CLIP_AVAILABLE, TORCH_AVAILABLE
+            CLIP_AVAILABLE = True
+            TORCH_AVAILABLE = True
+            
             return True
             
         except Exception as e:
@@ -714,11 +808,15 @@ class CLIPSemanticAnalyzer:
     
     async def analyze_semantic_similarity(self, before_image: bytes, after_image: bytes) -> Dict[str, Any]:
         """Analyze semantic similarity between two images"""
+        print("🔍 Starting semantic similarity analysis...")
+        
         # Lazy initialization on first use
         if not self._initialize_model():
+            error_msg = f"CLIP model not available: {self.initialization_error or 'Unknown error'}"
+            print(f"   ❌ {error_msg}")
             return {
                 "available": False,
-                "error": f"CLIP model not available: {self.initialization_error or 'Unknown error'}"
+                "error": error_msg
             }
         
         try:
@@ -763,11 +861,15 @@ class CLIPSemanticAnalyzer:
     
     async def classify_change_type(self, before_image: bytes, after_image: bytes) -> Dict[str, Any]:
         """Classify the type of change using CLIP"""
+        print("🏷️  Starting change type classification...")
+        
         # Lazy initialization on first use
         if not self._initialize_model():
+            error_msg = f"CLIP classification not available: {self.initialization_error or 'Unknown error'}"
+            print(f"   ❌ {error_msg}")
             return {
                 "available": False,
-                "error": f"CLIP classification not available: {self.initialization_error or 'Unknown error'}"
+                "error": error_msg
             }
         
         try:
