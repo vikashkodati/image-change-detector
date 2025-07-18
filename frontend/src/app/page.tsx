@@ -33,12 +33,59 @@ export default function Home() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [results, setResults] = useState<{
     success: boolean;
+    method?: string;
     results?: {
-      change_percentage: number;
-      changed_pixels: number;
-      total_pixels: number;
-      change_mask_base64: string;
-      contours_count: number;
+      // OpenCV results (legacy compatibility)
+      change_percentage?: number;
+      changed_pixels?: number;
+      total_pixels?: number;
+      change_mask_base64?: string;
+      contours_count?: number;
+      
+      // Hybrid results structure
+      hybrid_available?: boolean;
+      opencv_results?: {
+        change_percentage: number;
+        changed_pixels: number;
+        total_pixels: number;
+        change_mask_base64: string;
+        contours_count: number;
+      };
+      semantic_results?: {
+        available: boolean;
+        semantic_similarity?: number;
+        is_meaningful_change?: boolean;
+        change_confidence?: number;
+        interpretation?: string;
+        error?: string;
+      };
+      classification_results?: {
+        available: boolean;
+        top_categories?: Array<{
+          category: string;
+          confidence: number;
+          likelihood: string;
+        }>;
+        most_likely?: string;
+        max_confidence?: number;
+        error?: string;
+      };
+      final_assessment?: {
+        has_meaningful_change: boolean;
+        confidence: number;
+        reasoning: string;
+        change_type: string;
+        threat_level: string;
+      };
+      processing_time?: {
+        opencv_stage: string;
+        clip_stage: string;
+      };
+    };
+    enhanced_features?: {
+      semantic_analysis: boolean;
+      change_classification: boolean;
+      threat_assessment: string;
     };
     error?: string;
   } | null>(null);
@@ -140,18 +187,23 @@ export default function Home() {
           </div>
         </div>
 
-        {/* MCP Status Banner */}
+        {/* Enhanced MCP Status Banner */}
         <div className="matrix-card matrix-glow p-4 mb-8 rounded-lg matrix-scanline">
-          <div className="flex items-center justify-center space-x-4">
+          <div className="flex items-center justify-center space-x-2 flex-wrap">
             <div className="matrix-pulse">
               <div className="w-3 h-3 bg-green-400 rounded-full"></div>
             </div>
             <span className="matrix-text font-mono text-lg">
-              [SYSTEM STATUS: CONNECTED TO MATRIX] • MCP TOOLS: ACTIVE • GPT-4 VISION: ENABLED
+              [MATRIX AI: ONLINE] • MCP TOOLS: ACTIVE • HYBRID DETECTION: ENABLED
             </span>
             <div className="matrix-pulse">
               <div className="w-3 h-3 bg-green-400 rounded-full"></div>
             </div>
+          </div>
+          <div className="flex items-center justify-center space-x-2 mt-2 flex-wrap">
+            <span className="matrix-text font-mono text-sm opacity-80">
+              🧠 OpenCV + CLIP Semantic Analysis • 🎯 Change Classification • ⚡ Threat Assessment
+            </span>
           </div>
         </div>
 
@@ -270,47 +322,228 @@ export default function Home() {
                 <div className="space-y-6">
                   {results.success && results.results ? (
                     <>
-                      {/* Analysis Stats */}
-                      <div className="matrix-border p-4 rounded-lg bg-green-900/10">
-                        <h3 className="matrix-text text-xl font-mono mb-4">
-                          [CHANGE DETECTION MATRIX]
-                        </h3>
-                        <div className="grid grid-cols-2 gap-4 text-center">
-                          <div className="matrix-border p-3 rounded bg-black/50">
-                            <div className="matrix-text text-3xl font-bold matrix-pulse">
-                              {results.results.change_percentage.toFixed(2)}%
-                            </div>
-                            <div className="matrix-text text-sm opacity-70">CHANGE RATE</div>
-                          </div>
-                          <div className="matrix-border p-3 rounded bg-black/50">
-                            <div className="matrix-text text-3xl font-bold matrix-pulse">
-                              {results.results.contours_count}
-                            </div>
-                            <div className="matrix-text text-sm opacity-70">ANOMALIES</div>
-                          </div>
-                        </div>
-                        
-                        <div className="mt-4 matrix-border p-3 rounded bg-black/50">
-                          <div className="matrix-text text-lg font-mono">
-                            PIXELS ALTERED: {results.results.changed_pixels.toLocaleString()} / {results.results.total_pixels.toLocaleString()}
-                          </div>
+                      {/* Method Detection Banner */}
+                      <div className={`matrix-border p-3 rounded-lg ${
+                        results.method === 'hybrid_detection' ? 'bg-green-900/20' : 'bg-blue-900/20'
+                      }`}>
+                        <div className="matrix-text text-center font-mono">
+                          {results.method === 'hybrid_detection' ? 
+                            '🧠 HYBRID AI ANALYSIS: OpenCV + CLIP Semantic Detection' : 
+                            '🔍 LEGACY ANALYSIS: OpenCV Only'
+                          }
                         </div>
                       </div>
 
-                      {/* Change Mask Visualization */}
-                      {results.results.change_mask_base64 && (
-                        <div className="matrix-border p-4 rounded-lg bg-green-900/10">
-                          <h3 className="matrix-text text-xl font-mono mb-4">
-                            [CHANGE MASK OVERLAY]
-                          </h3>
-                          <div className="matrix-border rounded-lg overflow-hidden matrix-glow">
-                            <img
-                              src={`data:image/png;base64,${results.results.change_mask_base64}`}
-                              alt="Change Detection Mask"
-                              className="w-full h-auto"
-                            />
+                      {/* Enhanced Hybrid Results */}
+                      {results.results.hybrid_available && results.results.final_assessment ? (
+                        <>
+                          {/* Threat Assessment Banner */}
+                          <div className={`matrix-border p-4 rounded-lg ${
+                            results.results.final_assessment.threat_level === 'HIGH' ? 'bg-red-900/30 border-red-400' :
+                            results.results.final_assessment.threat_level === 'MEDIUM' ? 'bg-yellow-900/30 border-yellow-400' :
+                            'bg-green-900/10'
+                          }`}>
+                            <div className="text-center">
+                              <div className={`text-2xl font-bold font-mono ${
+                                results.results.final_assessment.threat_level === 'HIGH' ? 'text-red-400' :
+                                results.results.final_assessment.threat_level === 'MEDIUM' ? 'text-yellow-400' :
+                                'text-green-400'
+                              }`}>
+                                THREAT LEVEL: {results.results.final_assessment.threat_level}
+                              </div>
+                              <div className="matrix-text text-lg mt-2">
+                                CONFIDENCE: {(results.results.final_assessment.confidence * 100).toFixed(0)}%
+                              </div>
+                            </div>
                           </div>
-                        </div>
+
+                          {/* Final Assessment */}
+                          <div className="matrix-border p-4 rounded-lg bg-green-900/10">
+                            <h3 className="matrix-text text-xl font-mono mb-4">
+                              [AI ASSESSMENT MATRIX]
+                            </h3>
+                            <div className="space-y-3">
+                              <div className="matrix-border p-3 rounded bg-black/50">
+                                <div className="matrix-text font-mono">
+                                  <span className="text-green-400">STATUS:</span> {
+                                    results.results.final_assessment.has_meaningful_change ? 
+                                    'MEANINGFUL CHANGE DETECTED' : 'NO SIGNIFICANT CHANGE'
+                                  }
+                                </div>
+                              </div>
+                              <div className="matrix-border p-3 rounded bg-black/50">
+                                <div className="matrix-text font-mono">
+                                  <span className="text-green-400">TYPE:</span> {results.results.final_assessment.change_type.toUpperCase()}
+                                </div>
+                              </div>
+                              <div className="matrix-border p-3 rounded bg-black/50">
+                                <div className="matrix-text font-mono text-sm">
+                                  <span className="text-green-400">ANALYSIS:</span> {results.results.final_assessment.reasoning}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* OpenCV Pixel Analysis */}
+                          {results.results.opencv_results && (
+                            <div className="matrix-border p-4 rounded-lg bg-blue-900/10">
+                              <h3 className="matrix-text text-xl font-mono mb-4">
+                                [PIXEL DETECTION MATRIX]
+                              </h3>
+                              <div className="grid grid-cols-2 gap-4 text-center">
+                                <div className="matrix-border p-3 rounded bg-black/50">
+                                  <div className="matrix-text text-3xl font-bold matrix-pulse">
+                                    {results.results.opencv_results.change_percentage.toFixed(2)}%
+                                  </div>
+                                  <div className="matrix-text text-sm opacity-70">PIXEL CHANGE</div>
+                                </div>
+                                <div className="matrix-border p-3 rounded bg-black/50">
+                                  <div className="matrix-text text-3xl font-bold matrix-pulse">
+                                    {results.results.opencv_results.contours_count}
+                                  </div>
+                                  <div className="matrix-text text-sm opacity-70">REGIONS</div>
+                                </div>
+                              </div>
+                              <div className="mt-4 matrix-border p-3 rounded bg-black/50">
+                                <div className="matrix-text font-mono text-sm">
+                                  PIXELS: {results.results.opencv_results.changed_pixels.toLocaleString()} / {results.results.opencv_results.total_pixels.toLocaleString()}
+                                </div>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Semantic Analysis */}
+                          {results.results.semantic_results?.available && (
+                            <div className="matrix-border p-4 rounded-lg bg-purple-900/10">
+                              <h3 className="matrix-text text-xl font-mono mb-4">
+                                [SEMANTIC ANALYSIS MATRIX]
+                              </h3>
+                              <div className="space-y-3">
+                                <div className="matrix-border p-3 rounded bg-black/50">
+                                  <div className="matrix-text font-mono">
+                                    <span className="text-green-400">SIMILARITY:</span> {
+                                      (results.results.semantic_results.semantic_similarity! * 100).toFixed(1)
+                                    }%
+                                  </div>
+                                </div>
+                                {results.results.semantic_results.interpretation && (
+                                  <div className="matrix-border p-3 rounded bg-black/50">
+                                    <div className="matrix-text font-mono text-sm">
+                                      <span className="text-green-400">INTERPRETATION:</span> {results.results.semantic_results.interpretation}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Change Classification */}
+                          {results.results.classification_results?.available && results.results.classification_results.top_categories && (
+                            <div className="matrix-border p-4 rounded-lg bg-orange-900/10">
+                              <h3 className="matrix-text text-xl font-mono mb-4">
+                                [CHANGE CLASSIFICATION MATRIX]
+                              </h3>
+                              <div className="space-y-2">
+                                {results.results.classification_results.top_categories.slice(0, 3).map((category, index) => (
+                                  <div key={index} className="matrix-border p-3 rounded bg-black/50">
+                                    <div className="flex justify-between items-center">
+                                      <div className="matrix-text font-mono">
+                                        {category.category.toUpperCase()}
+                                      </div>
+                                      <div className={`font-mono text-sm ${
+                                        category.likelihood === 'high' ? 'text-green-400' :
+                                        category.likelihood === 'medium' ? 'text-yellow-400' : 'text-red-400'
+                                      }`}>
+                                        {(category.confidence * 100).toFixed(1)}% ({category.likelihood.toUpperCase()})
+                                      </div>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Change Mask Visualization */}
+                          {results.results.opencv_results?.change_mask_base64 && (
+                            <div className="matrix-border p-4 rounded-lg bg-green-900/10">
+                              <h3 className="matrix-text text-xl font-mono mb-4">
+                                [VISUAL CHANGE MATRIX]
+                              </h3>
+                              <div className="matrix-border rounded-lg overflow-hidden matrix-glow">
+                                <img
+                                  src={`data:image/png;base64,${results.results.opencv_results.change_mask_base64}`}
+                                  alt="Change Detection Mask"
+                                  className="w-full h-auto"
+                                />
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Processing Performance */}
+                          {results.results.processing_time && (
+                            <div className="matrix-border p-4 rounded-lg bg-gray-900/10">
+                              <h3 className="matrix-text text-xl font-mono mb-4">
+                                [PROCESSING PERFORMANCE]
+                              </h3>
+                              <div className="grid grid-cols-2 gap-4">
+                                <div className="matrix-border p-3 rounded bg-black/50">
+                                  <div className="matrix-text font-mono text-sm">
+                                    <span className="text-green-400">OPENCV:</span> {results.results.processing_time.opencv_stage}
+                                  </div>
+                                </div>
+                                <div className="matrix-border p-3 rounded bg-black/50">
+                                  <div className="matrix-text font-mono text-sm">
+                                    <span className="text-green-400">CLIP:</span> {results.results.processing_time.clip_stage}
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </>
+                      ) : (
+                        /* Legacy Results Display (backward compatibility) */
+                        <>
+                          <div className="matrix-border p-4 rounded-lg bg-green-900/10">
+                            <h3 className="matrix-text text-xl font-mono mb-4">
+                              [CHANGE DETECTION MATRIX]
+                            </h3>
+                            <div className="grid grid-cols-2 gap-4 text-center">
+                              <div className="matrix-border p-3 rounded bg-black/50">
+                                <div className="matrix-text text-3xl font-bold matrix-pulse">
+                                  {(results.results.change_percentage || 0).toFixed(2)}%
+                                </div>
+                                <div className="matrix-text text-sm opacity-70">CHANGE RATE</div>
+                              </div>
+                              <div className="matrix-border p-3 rounded bg-black/50">
+                                <div className="matrix-text text-3xl font-bold matrix-pulse">
+                                  {results.results.contours_count || 0}
+                                </div>
+                                <div className="matrix-text text-sm opacity-70">ANOMALIES</div>
+                              </div>
+                            </div>
+                            
+                            <div className="mt-4 matrix-border p-3 rounded bg-black/50">
+                              <div className="matrix-text text-lg font-mono">
+                                PIXELS ALTERED: {(results.results.changed_pixels || 0).toLocaleString()} / {(results.results.total_pixels || 0).toLocaleString()}
+                              </div>
+                            </div>
+                          </div>
+
+                          {results.results.change_mask_base64 && (
+                            <div className="matrix-border p-4 rounded-lg bg-green-900/10">
+                              <h3 className="matrix-text text-xl font-mono mb-4">
+                                [CHANGE MASK OVERLAY]
+                              </h3>
+                              <div className="matrix-border rounded-lg overflow-hidden matrix-glow">
+                                <img
+                                  src={`data:image/png;base64,${results.results.change_mask_base64}`}
+                                  alt="Change Detection Mask"
+                                  className="w-full h-auto"
+                                />
+                              </div>
+                            </div>
+                          )}
+                        </>
                       )}
                     </>
                   ) : (

@@ -19,6 +19,18 @@ from pydantic import BaseModel
 from openai import OpenAI
 from dotenv import load_dotenv
 
+# Hybrid AI imports
+try:
+    import torch
+    import clip
+    from torchvision import transforms
+    CLIP_AVAILABLE = True
+    print("✅ CLIP dependencies loaded successfully")
+except ImportError as e:
+    CLIP_AVAILABLE = False
+    print(f"⚠️  CLIP dependencies not available: {e}")
+    print("   Falling back to basic change detection only")
+
 # Load environment variables
 load_dotenv()
 
@@ -89,20 +101,27 @@ def create_fastapi_with_mcp():
             before_bytes = base64.b64decode(request.before_image_base64)
             after_bytes = base64.b64decode(request.after_image_base64)
             
-            # Perform change detection using the detector directly
-            results = await detector.detect_changes(before_bytes, after_bytes)
+            # Perform hybrid change detection (OpenCV + CLIP)
+            results = await detector.detect_changes_hybrid(before_bytes, after_bytes)
             
             # Check if the detection had errors
             if "error" in results:
-                return {
+                response_data = {
                     "success": False,
-                    "error": results["error"]
+                    "error": results["error"],
+                    "method": "hybrid_detection"
                 }
-            
-            response_data = {
-                "success": True,
-                "results": results
-            }
+            else:
+                response_data = {
+                    "success": True,
+                    "results": results,
+                    "method": "hybrid_detection",
+                    "enhanced_features": {
+                        "semantic_analysis": results.get("semantic_results", {}).get("available", False),
+                        "change_classification": results.get("classification_results", {}).get("available", False),
+                        "threat_assessment": results.get("final_assessment", {}).get("threat_level", "UNKNOWN")
+                    }
+                }
             response = JSONResponse(content=response_data)
             response.headers["Access-Control-Allow-Origin"] = "*"
             response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
@@ -201,6 +220,10 @@ def create_fastapi_with_mcp():
                     "description": "Detect changes between two satellite images using OpenCV"
                 },
                 {
+                    "name": "detect_changes_hybrid_mcp",
+                    "description": "Hybrid change detection using OpenCV + CLIP semantic analysis"
+                },
+                {
                     "name": "analyze_changes_with_ai", 
                     "description": "Use GPT-4 Vision to analyze and describe changes"
                 },
@@ -213,9 +236,85 @@ def create_fastapi_with_mcp():
                     "description": "Server health check"
                 }
             ],
-            "server": "FastMCP-powered Image Change Detector",
-            "mcp_available": True
+            "server": "FastMCP-powered Image Change Detector (Hybrid AI)",
+            "mcp_available": True,
+            "hybrid_features": {
+                "semantic_analysis": semantic_analyzer is not None,
+                "change_classification": CLIP_AVAILABLE,
+                "threat_assessment": True
+            }
         }
+    
+    # New Hybrid AI endpoints
+    @app.post("/api/semantic-analysis")
+    async def api_semantic_analysis(request: DetectChangesRequest):
+        """REST API endpoint for CLIP semantic similarity analysis"""
+        if not semantic_analyzer or not CLIP_AVAILABLE:
+            response_data = {
+                "success": False,
+                "error": "CLIP semantic analysis not available",
+                "available": False
+            }
+        else:
+            try:
+                before_bytes = base64.b64decode(request.before_image_base64)
+                after_bytes = base64.b64decode(request.after_image_base64)
+                
+                results = await semantic_analyzer.analyze_semantic_similarity(before_bytes, after_bytes)
+                
+                response_data = {
+                    "success": True,
+                    "results": results,
+                    "method": "clip_semantic_analysis"
+                }
+                
+            except Exception as e:
+                response_data = {
+                    "success": False,
+                    "error": str(e),
+                    "method": "clip_semantic_analysis"
+                }
+        
+        response = JSONResponse(content=response_data)
+        response.headers["Access-Control-Allow-Origin"] = "*"
+        response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
+        response.headers["Access-Control-Allow-Headers"] = "*"
+        return response
+    
+    @app.post("/api/classify-change")
+    async def api_classify_change(request: DetectChangesRequest):
+        """REST API endpoint for CLIP change type classification"""
+        if not semantic_analyzer or not CLIP_AVAILABLE:
+            response_data = {
+                "success": False,
+                "error": "CLIP change classification not available",
+                "available": False
+            }
+        else:
+            try:
+                before_bytes = base64.b64decode(request.before_image_base64)
+                after_bytes = base64.b64decode(request.after_image_base64)
+                
+                results = await semantic_analyzer.classify_change_type(before_bytes, after_bytes)
+                
+                response_data = {
+                    "success": True,
+                    "results": results,
+                    "method": "clip_change_classification"
+                }
+                
+            except Exception as e:
+                response_data = {
+                    "success": False,
+                    "error": str(e),
+                    "method": "clip_change_classification"
+                }
+        
+        response = JSONResponse(content=response_data)
+        response.headers["Access-Control-Allow-Origin"] = "*"
+        response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
+        response.headers["Access-Control-Allow-Headers"] = "*"
+        return response
     
     return app
 
@@ -283,6 +382,194 @@ class ChangeDetector:
                 "contours_count": 0
             }
     
+    async def detect_changes_hybrid(self, before_image: bytes, after_image: bytes) -> Dict[str, Any]:
+        """
+        Hybrid change detection: OpenCV + CLIP semantic analysis
+        Stage 1: Fast OpenCV pixel detection
+        Stage 2: CLIP semantic validation and classification
+        """
+        try:
+            print("🔍 Starting hybrid change detection...")
+            
+            # Stage 1: OpenCV pixel-level detection
+            print("   Stage 1: OpenCV pixel detection...")
+            opencv_results = await self.detect_changes(before_image, after_image)
+            
+            # Check if OpenCV detected any changes
+            if "error" in opencv_results:
+                return {
+                    "hybrid_available": True,
+                    "method": "opencv_only",
+                    "opencv_results": opencv_results,
+                    "semantic_results": {"available": False, "error": "OpenCV failed"},
+                    "final_assessment": {
+                        "has_meaningful_change": False,
+                        "confidence": 0.0,
+                        "reasoning": f"OpenCV detection failed: {opencv_results['error']}"
+                    }
+                }
+            
+            change_percentage = opencv_results.get("change_percentage", 0)
+            
+            # Early exit if no pixel changes detected
+            if change_percentage < 0.5:
+                print("   No significant pixel changes detected - skipping CLIP analysis")
+                return {
+                    "hybrid_available": True,
+                    "method": "opencv_early_exit",
+                    "opencv_results": opencv_results,
+                    "semantic_results": {"available": False, "reason": "No pixel changes to analyze"},
+                    "final_assessment": {
+                        "has_meaningful_change": False,
+                        "confidence": 0.95,
+                        "reasoning": "No significant pixel-level changes detected"
+                    }
+                }
+            
+            # Stage 2: CLIP semantic analysis (only if pixel changes found)
+            print("   Stage 2: CLIP semantic validation...")
+            semantic_results = {}
+            classification_results = {}
+            
+            if semantic_analyzer and CLIP_AVAILABLE:
+                # Semantic similarity analysis
+                semantic_results = await semantic_analyzer.analyze_semantic_similarity(
+                    before_image, after_image
+                )
+                
+                # Change type classification
+                classification_results = await semantic_analyzer.classify_change_type(
+                    before_image, after_image
+                )
+            else:
+                semantic_results = {"available": False, "error": "CLIP not available"}
+                classification_results = {"available": False, "error": "CLIP not available"}
+            
+            # Combine results and make final assessment
+            final_assessment = self._assess_hybrid_results(
+                opencv_results, semantic_results, classification_results
+            )
+            
+            print(f"   Hybrid assessment: {final_assessment['has_meaningful_change']} (confidence: {final_assessment['confidence']})")
+            
+            return {
+                "hybrid_available": True,
+                "method": "full_hybrid" if semantic_results.get("available") else "opencv_only",
+                "opencv_results": opencv_results,
+                "semantic_results": semantic_results,
+                "classification_results": classification_results,
+                "final_assessment": final_assessment,
+                "processing_time": {
+                    "opencv_stage": "~100ms",
+                    "clip_stage": "~200ms" if semantic_results.get("available") else "skipped"
+                }
+            }
+            
+        except Exception as e:
+            return {
+                "hybrid_available": True,
+                "error": f"Hybrid detection failed: {str(e)}",
+                "method": "error",
+                "final_assessment": {
+                    "has_meaningful_change": False,
+                    "confidence": 0.0,
+                    "reasoning": f"System error: {str(e)}"
+                }
+            }
+    
+    def _assess_hybrid_results(self, opencv_results: Dict, semantic_results: Dict, 
+                              classification_results: Dict) -> Dict[str, Any]:
+        """Combine OpenCV and CLIP results to make final assessment"""
+        
+        change_percentage = opencv_results.get("change_percentage", 0)
+        
+        # If CLIP is not available, fall back to OpenCV only
+        if not semantic_results.get("available", False):
+            # Conservative threshold for OpenCV-only decisions
+            has_change = change_percentage > 2.0  # Higher threshold without semantic filtering
+            confidence = 0.7 if has_change else 0.8  # Lower confidence without CLIP
+            
+            return {
+                "has_meaningful_change": has_change,
+                "confidence": confidence,
+                "reasoning": f"OpenCV-only: {change_percentage:.2f}% pixel changes (CLIP unavailable)",
+                "change_type": "unknown",
+                "threat_level": "MEDIUM" if has_change else "LOW"
+            }
+        
+        # Get CLIP semantic analysis
+        semantic_similarity = semantic_results.get("semantic_similarity", 1.0)
+        is_meaningful = semantic_results.get("is_meaningful_change", False)
+        change_confidence = semantic_results.get("change_confidence", 0.0)
+        
+        # Get classification results
+        most_likely_change = classification_results.get("most_likely", "unknown")
+        max_confidence = classification_results.get("max_confidence", 0.0)
+        
+        # Decision logic: Combine pixel changes + semantic analysis
+        if change_percentage > 10.0:
+            # High pixel changes - trust CLIP semantic validation
+            if is_meaningful and change_confidence > 0.1:
+                result = {
+                    "has_meaningful_change": True,
+                    "confidence": min(0.95, 0.8 + change_confidence),
+                    "reasoning": f"High pixel changes ({change_percentage:.2f}%) + semantic validation (similarity: {semantic_similarity:.3f})",
+                    "change_type": most_likely_change,
+                    "threat_level": self._determine_threat_level(most_likely_change, change_confidence)
+                }
+            else:
+                result = {
+                    "has_meaningful_change": False,
+                    "confidence": 0.85,
+                    "reasoning": f"High pixel changes ({change_percentage:.2f}%) but semantically similar (similarity: {semantic_similarity:.3f}) - likely noise",
+                    "change_type": "noise_or_artifacts",
+                    "threat_level": "LOW"
+                }
+        elif change_percentage > 2.0:
+            # Medium pixel changes - CLIP is decisive
+            if is_meaningful:
+                result = {
+                    "has_meaningful_change": True,
+                    "confidence": 0.7 + change_confidence * 0.2,
+                    "reasoning": f"Moderate pixel changes ({change_percentage:.2f}%) with semantic differences (similarity: {semantic_similarity:.3f})",
+                    "change_type": most_likely_change,
+                    "threat_level": self._determine_threat_level(most_likely_change, change_confidence)
+                }
+            else:
+                result = {
+                    "has_meaningful_change": False,
+                    "confidence": 0.80,
+                    "reasoning": f"Moderate pixel changes ({change_percentage:.2f}%) but semantically very similar (similarity: {semantic_similarity:.3f})",
+                    "change_type": "minor_variations",
+                    "threat_level": "LOW"
+                }
+        else:
+            # Low pixel changes - probably noise
+            result = {
+                "has_meaningful_change": False,
+                "confidence": 0.90,
+                "reasoning": f"Low pixel changes ({change_percentage:.2f}%) - insufficient for meaningful change",
+                "change_type": "no_change",
+                "threat_level": "NONE"
+            }
+        
+        return result
+    
+    def _determine_threat_level(self, change_type: str, confidence: float) -> str:
+        """Determine threat level based on change type and confidence"""
+        disaster_keywords = ["destruction", "damage", "fire", "flood", "disaster"]
+        infrastructure_keywords = ["construction", "development", "urban", "road"]
+        environmental_keywords = ["vegetation", "deforestation", "drought"]
+        
+        if any(keyword in change_type.lower() for keyword in disaster_keywords):
+            return "HIGH" if confidence > 0.3 else "MEDIUM"
+        elif any(keyword in change_type.lower() for keyword in infrastructure_keywords):
+            return "MEDIUM" if confidence > 0.2 else "LOW"
+        elif any(keyword in change_type.lower() for keyword in environmental_keywords):
+            return "MEDIUM" if confidence > 0.25 else "LOW"
+        else:
+            return "LOW"
+    
     def _bytes_to_cv_image(self, image_bytes: bytes) -> np.ndarray:
         """Convert bytes to OpenCV image"""
         # Try to handle different image formats
@@ -302,6 +589,194 @@ class ChangeDetector:
 
 # Initialize change detector
 detector = ChangeDetector()
+
+class CLIPSemanticAnalyzer:
+    """CLIP-based semantic change analysis for hybrid detection"""
+    
+    def __init__(self):
+        self.model = None
+        self.preprocess = None
+        self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        self.change_categories = [
+            "building destruction", "building construction", "building damage",
+            "vegetation loss", "vegetation growth", "deforestation",
+            "flooding", "drought", "water level change",
+            "fire damage", "burn scars", "smoke",
+            "road construction", "infrastructure development",
+            "urban expansion", "demolition",
+            "seasonal change", "snow cover", "cloud shadows",
+            "agricultural change", "crop harvesting", "farming activity"
+        ]
+        
+        if CLIP_AVAILABLE:
+            self._initialize_model()
+    
+    def _initialize_model(self):
+        """Initialize CLIP model and preprocessing"""
+        try:
+            print("🧠 Initializing CLIP model for semantic analysis...")
+            # Use smaller ViT-B/32 model for better performance
+            self.model, self.preprocess = clip.load("ViT-B/32", device=self.device)
+            self.model.eval()
+            
+            # Precompute text embeddings for change categories
+            self.category_embeddings = self._precompute_category_embeddings()
+            print(f"✅ CLIP model loaded on {self.device}")
+            
+        except Exception as e:
+            print(f"❌ Failed to initialize CLIP model: {e}")
+            self.model = None
+    
+    def _precompute_category_embeddings(self):
+        """Precompute embeddings for change categories"""
+        if not self.model:
+            return {}
+        
+        try:
+            category_texts = [f"satellite image showing {category}" for category in self.change_categories]
+            text_tokens = clip.tokenize(category_texts).to(self.device)
+            
+            with torch.no_grad():
+                text_embeddings = self.model.encode_text(text_tokens)
+                text_embeddings = text_embeddings / text_embeddings.norm(dim=-1, keepdim=True)
+            
+            return {
+                category: embedding for category, embedding 
+                in zip(self.change_categories, text_embeddings)
+            }
+        except Exception as e:
+            print(f"⚠️  Failed to precompute category embeddings: {e}")
+            return {}
+    
+    def _preprocess_image(self, image_bytes: bytes) -> torch.Tensor:
+        """Preprocess image for CLIP"""
+        try:
+            # Convert bytes to PIL Image
+            image = Image.open(BytesIO(image_bytes)).convert('RGB')
+            
+            # Apply CLIP preprocessing
+            preprocessed = self.preprocess(image).unsqueeze(0).to(self.device)
+            return preprocessed
+            
+        except Exception as e:
+            print(f"❌ Image preprocessing failed: {e}")
+            return None
+    
+    async def analyze_semantic_similarity(self, before_image: bytes, after_image: bytes) -> Dict[str, Any]:
+        """Analyze semantic similarity between two images"""
+        if not self.model or not CLIP_AVAILABLE:
+            return {
+                "available": False,
+                "error": "CLIP model not available"
+            }
+        
+        try:
+            # Preprocess images
+            before_tensor = self._preprocess_image(before_image)
+            after_tensor = self._preprocess_image(after_image)
+            
+            if before_tensor is None or after_tensor is None:
+                return {"error": "Image preprocessing failed"}
+            
+            # Generate image embeddings
+            with torch.no_grad():
+                before_embedding = self.model.encode_image(before_tensor)
+                after_embedding = self.model.encode_image(after_tensor)
+                
+                # Normalize embeddings
+                before_embedding = before_embedding / before_embedding.norm(dim=-1, keepdim=True)
+                after_embedding = after_embedding / after_embedding.norm(dim=-1, keepdim=True)
+                
+                # Calculate cosine similarity
+                similarity = torch.cosine_similarity(before_embedding, after_embedding).item()
+            
+            # Determine if change is meaningful
+            # Similarity > 0.95 = very similar (likely noise)
+            # Similarity < 0.85 = significant semantic change
+            is_meaningful = similarity < 0.90
+            change_confidence = 1 - similarity if similarity < 0.90 else 0.0
+            
+            return {
+                "available": True,
+                "semantic_similarity": round(similarity, 4),
+                "is_meaningful_change": is_meaningful,
+                "change_confidence": round(change_confidence, 4),
+                "interpretation": self._interpret_similarity(similarity)
+            }
+            
+        except Exception as e:
+            return {
+                "available": True,
+                "error": f"Semantic analysis failed: {str(e)}"
+            }
+    
+    async def classify_change_type(self, before_image: bytes, after_image: bytes) -> Dict[str, Any]:
+        """Classify the type of change using CLIP"""
+        if not self.model or not CLIP_AVAILABLE or not self.category_embeddings:
+            return {
+                "available": False,
+                "error": "CLIP classification not available"
+            }
+        
+        try:
+            # Generate embedding for the "after" image (shows the change result)
+            after_tensor = self._preprocess_image(after_image)
+            if after_tensor is None:
+                return {"error": "Image preprocessing failed"}
+            
+            with torch.no_grad():
+                image_embedding = self.model.encode_image(after_tensor)
+                image_embedding = image_embedding / image_embedding.norm(dim=-1, keepdim=True)
+                
+                # Calculate similarities with all categories
+                similarities = {}
+                for category, text_embedding in self.category_embeddings.items():
+                    similarity = torch.cosine_similarity(
+                        image_embedding, 
+                        text_embedding.unsqueeze(0)
+                    ).item()
+                    similarities[category] = similarity
+                
+                # Get top 3 most likely change types
+                top_categories = sorted(similarities.items(), key=lambda x: x[1], reverse=True)[:3]
+                
+                return {
+                    "available": True,
+                    "top_categories": [
+                        {
+                            "category": category,
+                            "confidence": round(similarity, 4),
+                            "likelihood": "high" if similarity > 0.25 else "medium" if similarity > 0.15 else "low"
+                        }
+                        for category, similarity in top_categories
+                    ],
+                    "most_likely": top_categories[0][0] if top_categories else "unknown",
+                    "max_confidence": round(top_categories[0][1], 4) if top_categories else 0.0
+                }
+                
+        except Exception as e:
+            return {
+                "available": True,
+                "error": f"Change classification failed: {str(e)}"
+            }
+    
+    def _interpret_similarity(self, similarity: float) -> str:
+        """Interpret semantic similarity score"""
+        if similarity > 0.95:
+            return "Virtually identical - likely noise or compression artifacts"
+        elif similarity > 0.90:
+            return "Very similar - minor lighting or seasonal changes"
+        elif similarity > 0.80:
+            return "Moderately similar - some changes detected"
+        elif similarity > 0.70:
+            return "Somewhat different - notable changes present"
+        elif similarity > 0.60:
+            return "Quite different - significant changes detected"
+        else:
+            return "Very different - major changes or completely different scenes"
+
+# Initialize semantic analyzer
+semantic_analyzer = CLIPSemanticAnalyzer() if CLIP_AVAILABLE else None
 
 # Create the FastAPI app at module level for Railway
 app = None
@@ -506,14 +981,58 @@ async def answer_question_about_changes(
             "error": f"Question answering failed: {str(e)}"
         }
 
+@mcp.tool()
+async def detect_changes_hybrid_mcp(before_image_base64: str, after_image_base64: str) -> Dict[str, Any]:
+    """
+    Hybrid change detection using OpenCV + CLIP semantic analysis
+    
+    Args:
+        before_image_base64: Base64 encoded before image
+        after_image_base64: Base64 encoded after image
+        
+    Returns:
+        Dictionary containing hybrid analysis results with pixel detection + semantic validation
+    """
+    try:
+        # Decode base64 images
+        before_bytes = base64.b64decode(before_image_base64)
+        after_bytes = base64.b64decode(after_image_base64)
+        
+        # Perform hybrid detection
+        results = await detector.detect_changes_hybrid(before_bytes, after_bytes)
+        
+        return {
+            "success": True,
+            "results": results,
+            "method": "hybrid_detection",
+            "capabilities": {
+                "opencv_available": True,
+                "clip_available": CLIP_AVAILABLE,
+                "semantic_analysis": semantic_analyzer is not None
+            }
+        }
+        
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e),
+            "method": "hybrid_detection"
+        }
+
 # Basic health check
 @mcp.tool()
 async def health_check() -> Dict[str, Any]:
     """Health check endpoint"""
     return {
         "status": "healthy",
-        "service": "Image Change Detector Server",
-        "version": "0.1.0"
+        "service": "Image Change Detector Server (Hybrid AI)",
+        "version": "0.1.0",
+        "capabilities": {
+            "opencv": True,
+            "clip": CLIP_AVAILABLE,
+            "semantic_analysis": semantic_analyzer is not None,
+            "hybrid_detection": True
+        }
     }
 
 if __name__ == "__main__":
