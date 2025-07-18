@@ -373,7 +373,7 @@ export default function Home() {
                               </div>
                               <div className="matrix-border p-3 rounded bg-black/50">
                                 <div className="matrix-text font-mono">
-                                  <span className="text-green-400">TYPE:</span> {results.results.final_assessment.change_type.toUpperCase()}
+                                  <span className="text-green-400">TYPE:</span> {results.results.final_assessment.change_type?.toUpperCase() || 'UNKNOWN'}
                                 </div>
                               </div>
                               <div className="matrix-border p-3 rounded bg-black/50">
@@ -448,13 +448,13 @@ export default function Home() {
                                   <div key={index} className="matrix-border p-3 rounded bg-black/50">
                                     <div className="flex justify-between items-center">
                                       <div className="matrix-text font-mono">
-                                        {category.category.toUpperCase()}
+                                        {category.category?.toUpperCase() || 'UNKNOWN'}
                                       </div>
                                       <div className={`font-mono text-sm ${
                                         category.likelihood === 'high' ? 'text-green-400' :
                                         category.likelihood === 'medium' ? 'text-yellow-400' : 'text-red-400'
                                       }`}>
-                                        {(category.confidence * 100).toFixed(1)}% ({category.likelihood.toUpperCase()})
+                                        {((category.confidence || 0) * 100).toFixed(1)}% ({category.likelihood?.toUpperCase() || 'UNKNOWN'})
                                       </div>
                                     </div>
                                   </div>
