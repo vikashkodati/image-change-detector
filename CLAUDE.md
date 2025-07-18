@@ -244,14 +244,31 @@ python deploy.py
 ```
 
 ### **Environment Configuration**
+
+#### **Backend (.env)**
 ```bash
-# Backend (.env)
 OPENAI_API_KEY=your_openai_api_key_here
 PORT=8000
 NODE_ENV=development
+```
 
-# Frontend (.env.local)  
+#### **Frontend (.env.local)**
+```bash
+# Local Development
 NEXT_PUBLIC_API_URL=http://localhost:8000
+
+# Production (Vercel Environment Variables)
+# ⚠️ CRITICAL: Must include https:// protocol!
+NEXT_PUBLIC_API_URL=https://your-railway-app.railway.app
+```
+
+#### **⚠️ Common Environment Variable Mistakes**
+```bash
+❌ image-change-detector-production.up.railway.app   # Missing https://
+❌ https://my-app.railway.app/                        # Trailing slash
+❌ http://my-app.railway.app                          # Wrong protocol
+
+✅ https://image-change-detector-production.up.railway.app  # Correct!
 ```
 
 ## 🎯 Implementation Status
@@ -322,6 +339,7 @@ NEXT_PUBLIC_API_URL=http://localhost:8000
 3. **MCP Tool Import Issues** → Fixed PYTHONPATH configuration
 4. **Matrix Rain Performance** → Optimized Canvas rendering
 5. **Production Build Errors** → Fixed TypeScript types and ESLint config
+6. **⚠️ CRITICAL: Vercel Environment Variable** → MUST include `https://` protocol in `NEXT_PUBLIC_API_URL`
 
 ### **Development Notes**
 - **MCP Tools**: Use `@mcp.tool()` decorator for new tools
@@ -329,6 +347,13 @@ NEXT_PUBLIC_API_URL=http://localhost:8000
 - **API Bridge**: Add REST endpoints in server.py for frontend access
 - **Environment**: Always test with and without API keys
 - **Performance**: Monitor Canvas animation performance on mobile
+
+### **Deployment Troubleshooting**
+- **CORS Errors**: Check Railway logs for CORS middleware configuration
+- **405 Method Not Allowed**: Verify Railway start command uses correct module path
+- **Connection Refused**: Ensure Railway backend health check passes at `/api/health`
+- **⚠️ Malformed URLs**: Vercel `NEXT_PUBLIC_API_URL` MUST include `https://` protocol
+- **Environment Variables**: Set in both Production, Preview, and Development environments
 
 ## 🤝 Development Workflow
 

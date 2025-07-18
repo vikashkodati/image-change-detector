@@ -108,17 +108,32 @@ NEXT_PUBLIC_API_URL=http://localhost:8000
 
 ### **Frontend: Vercel**
 
-1. **Update API URL:**
-   Add to Vercel environment variables:
+1. **⚠️ CRITICAL: Set API URL Environment Variable**
+   **In Vercel dashboard** → Your project → Settings → Environment Variables:
+   - **Name:** `NEXT_PUBLIC_API_URL`
+   - **Value:** `https://your-actual-railway-url.railway.app`
+   - **⚠️ MUST include `https://` protocol** (common error!)
+   - **⚠️ NO trailing slash**
+   - **Environments:** ✅ Production ✅ Preview ✅ Development (check all)
+
+   **Example correct values:**
    ```
-   NEXT_PUBLIC_API_URL=https://your-backend-url.railway.app
+   ✅ https://image-change-detector-production.up.railway.app
+   ✅ https://my-app-production.railway.app
+   ```
+
+   **Common mistakes to avoid:**
+   ```
+   ❌ image-change-detector-production.up.railway.app  (missing https://)
+   ❌ https://my-app.railway.app/                       (trailing slash)
+   ❌ http://my-app.railway.app                         (wrong protocol)
    ```
 
 2. **Deploy to Vercel:**
    - Visit [Vercel.com](https://vercel.com)
    - Import GitHub repository
    - Set root directory: `frontend`
-   - Add environment variable
+   - Add environment variable (step 1 above)
    - Deploy!
 
 ### **Automated Deployment**
