@@ -303,7 +303,7 @@ export default function Home() {
             </span>
           </div>
           {/* CLIP Debug Panel */}
-          <div className="mt-4 flex justify-center space-x-4">
+          <div className="mt-4 flex justify-center space-x-2 flex-wrap gap-2">
             <Button
               variant="outline"
               size="sm"
@@ -318,7 +318,7 @@ export default function Home() {
               }}
               className="text-xs"
             >
-              🔍 CHECK CLIP STATUS
+              🔍 CLIP STATUS
             </Button>
             <Button
               variant="outline" 
@@ -334,7 +334,48 @@ export default function Home() {
               }}
               className="text-xs"
             >
-              🚀 FORCE CLIP INIT
+              🚀 FORCE INIT
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={async () => {
+                try {
+                  const response = await fetch(`${API_URL}/api/debug-imports`, { method: 'POST' });
+                  const data = await response.json();
+                  
+                  // Create a more readable debug report
+                  let report = "🔍 CLIP IMPORT DEBUG REPORT\n";
+                  report += "=" + "=".repeat(50) + "\n\n";
+                  
+                  report += "📦 PACKAGE IMPORTS:\n";
+                  Object.entries(data.imports as any).forEach(([name, info]: [string, any]) => {
+                    const status = info.available ? "✅" : "❌";
+                    report += `${status} ${name}: ${info.available ? info.version : info.error}\n`;
+                  });
+                  
+                  report += "\n🧠 CLIP STATUS:\n";
+                  if (data.clip_status.import_success) {
+                    report += `✅ CLIP imported successfully\n`;
+                    report += `📋 Available models: ${data.clip_status.models?.join(', ') || 'unknown'}\n`;
+                  } else {
+                    report += `❌ CLIP import failed: ${data.clip_status.error}\n`;
+                  }
+                  
+                  report += "\n🖥️ SYSTEM INFO:\n";
+                  report += `🐍 Python: ${data.python_version.split(' ')[0]}\n`;
+                  if (data.system_info.env_vars) {
+                    report += `📁 PYTHONPATH: ${data.system_info.env_vars.PYTHONPATH}\n`;
+                  }
+                  
+                  alert(report);
+                } catch (error) {
+                  alert(`Error debugging imports: ${error}`);
+                }
+              }}
+              className="text-xs"
+            >
+              🐛 DEBUG IMPORTS
             </Button>
           </div>
         </div>

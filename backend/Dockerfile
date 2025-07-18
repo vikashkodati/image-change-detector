@@ -28,9 +28,19 @@ WORKDIR /app/backend
 # Install Python dependencies including AI packages
 RUN uv sync --frozen
 
-# Install CLIP from git (separate step for better error handling)
-RUN uv pip install "git+https://github.com/openai/CLIP.git" || \
-    echo "⚠️  CLIP installation failed - will run with OpenCV-only mode"
+# Install CLIP with multiple fallback strategies
+RUN echo "📥 Installing CLIP..." && \
+    uv pip install "git+https://github.com/openai/CLIP.git" || \
+    (echo "⚠️  Git CLIP install failed, trying pip fallback..." && \
+     uv pip install clip-by-openai || \
+     echo "❌ All CLIP installation methods failed - will run with OpenCV-only mode")
+
+# Verify installations
+RUN echo "🔍 Verifying installations..." && \
+    uv run python -c "import torch; print(f'✅ torch: {torch.__version__}')" && \
+    uv run python -c "import torchvision; print(f'✅ torchvision: {torchvision.__version__}')" && \
+    (uv run python -c "import clip; print(f'✅ CLIP: {clip.available_models()}')" || \
+     echo "⚠️  CLIP verification failed but torch is available")
 
 # Copy source code
 COPY backend/src/ ./src/

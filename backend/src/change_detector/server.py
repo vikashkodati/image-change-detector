@@ -39,10 +39,23 @@ def check_clip_availability():
     if CLIP_AVAILABLE:
         return True
     
+    print("🔍 Checking CLIP availability...")
+    print(f"   TORCH_AVAILABLE: {TORCH_AVAILABLE}")
+    print(f"   torch object: {torch is not None}")
+    print(f"   clip object: {clip is not None}")
+    
     if TORCH_AVAILABLE and torch is not None and clip is not None:
         try:
             # Test that we can actually use the models
-            _ = torch.cuda.is_available()  # Basic torch test
+            print("   Testing torch.cuda.is_available()...")
+            cuda_available = torch.cuda.is_available()
+            print(f"   CUDA available: {cuda_available}")
+            
+            # Test basic CLIP functionality
+            print("   Testing CLIP.available_models()...")
+            available_models = clip.available_models()
+            print(f"   Available CLIP models: {available_models}")
+            
             CLIP_AVAILABLE = True
             print("✅ CLIP dependencies verified and available")
             return True
@@ -50,11 +63,21 @@ def check_clip_availability():
             CLIP_AVAILABLE = False
             CLIP_IMPORT_ERROR = str(e)
             print(f"⚠️  CLIP runtime check failed: {e}")
+            print(f"   Exception type: {type(e)}")
+            print(f"   Exception details: {e}")
             return False
     else:
         CLIP_AVAILABLE = False
-        CLIP_IMPORT_ERROR = "CLIP dependencies not imported"
-        print(f"⚠️  CLIP dependencies not available")
+        if not TORCH_AVAILABLE:
+            CLIP_IMPORT_ERROR = "torch/torchvision packages not available at module level"
+        elif torch is None:
+            CLIP_IMPORT_ERROR = "torch object is None (import failed)"
+        elif clip is None:
+            CLIP_IMPORT_ERROR = "clip object is None (import failed)"
+        else:
+            CLIP_IMPORT_ERROR = "Unknown import issue"
+            
+        print(f"⚠️  CLIP dependencies not available: {CLIP_IMPORT_ERROR}")
         print("   Will fall back to OpenCV-only detection")
         return False
 
@@ -351,6 +374,64 @@ def create_fastapi_with_mcp():
             }
         except Exception as e:
             return {"success": False, "error": str(e)}
+    
+    @app.post("/api/debug-imports")
+    async def api_debug_imports():
+        """Comprehensive import debugging for CLIP issues"""
+        debug_info = {
+            "timestamp": str(__import__('datetime').datetime.now()),
+            "python_version": __import__('sys').version,
+            "imports": {},
+            "clip_status": {},
+            "system_info": {}
+        }
+        
+        # Test individual imports
+        import_tests = [
+            ("torch", "torch"),
+            ("torchvision", "torchvision"), 
+            ("clip", "clip"),
+            ("ftfy", "ftfy"),
+            ("regex", "regex"),
+            ("PIL", "PIL"),
+            ("numpy", "numpy")
+        ]
+        
+        for name, module_name in import_tests:
+            try:
+                module = __import__(module_name)
+                debug_info["imports"][name] = {
+                    "available": True,
+                    "version": getattr(module, "__version__", "unknown"),
+                    "file": getattr(module, "__file__", "unknown")
+                }
+            except ImportError as e:
+                debug_info["imports"][name] = {
+                    "available": False,
+                    "error": str(e)
+                }
+        
+        # CLIP specific tests
+        try:
+            import clip
+            debug_info["clip_status"]["models"] = clip.available_models()
+            debug_info["clip_status"]["import_success"] = True
+        except Exception as e:
+            debug_info["clip_status"]["import_success"] = False
+            debug_info["clip_status"]["error"] = str(e)
+        
+        # System info
+        try:
+            import os
+            debug_info["system_info"]["env_vars"] = {
+                "PYTHONPATH": os.environ.get("PYTHONPATH", "not set"),
+                "PATH": os.environ.get("PATH", "")[:200] + "...",  # Truncated
+                "UV_SYSTEM_PYTHON": os.environ.get("UV_SYSTEM_PYTHON", "not set")
+            }
+        except Exception as e:
+            debug_info["system_info"]["error"] = str(e)
+        
+        return debug_info
     
     # Add MCP tools documentation endpoint
     @app.get("/mcp/tools")
