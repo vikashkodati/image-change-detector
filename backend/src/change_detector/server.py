@@ -59,9 +59,14 @@ def create_fastapi_with_mcp():
     # Add CORS middleware - allow all origins for public deployment
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],  # Allow all origins for public access
-        allow_credentials=False,  # Set to False when allowing all origins
-        allow_methods=["GET", "POST", "OPTIONS"],
+        allow_origins=[
+            "https://image-change-detector.vercel.app",
+            "http://localhost:3000",
+            "http://localhost:3001",
+            "https://railway.com"  # Railway seems to enforce this
+        ],
+        allow_credentials=True,
+        allow_methods=["GET", "POST", "OPTIONS", "PUT", "DELETE"],
         allow_headers=["*"],
     )
     
