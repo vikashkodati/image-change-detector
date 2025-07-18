@@ -1,4 +1,4 @@
-# Railway Configuration for Matrix Change Detector
+# Railway Configuration for Matrix Change Detector (Hybrid AI)
 # Build from root directory with explicit backend paths
 
 [build]
@@ -8,7 +8,7 @@ dockerfilePath = "backend/Dockerfile"
 [deploy]
 startCommand = "uv run python src/change_detector/server.py"
 healthcheckPath = "/api/health"
-healthcheckTimeout = 30
+healthcheckTimeout = 120  # Increased for AI model loading
 restartPolicyType = "ON_FAILURE"
 
 [env]

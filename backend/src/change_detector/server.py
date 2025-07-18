@@ -19,17 +19,33 @@ from pydantic import BaseModel
 from openai import OpenAI
 from dotenv import load_dotenv
 
-# Hybrid AI imports
-try:
-    import torch
-    import clip
-    from torchvision import transforms
-    CLIP_AVAILABLE = True
-    print("✅ CLIP dependencies loaded successfully")
-except ImportError as e:
-    CLIP_AVAILABLE = False
-    print(f"⚠️  CLIP dependencies not available: {e}")
-    print("   Falling back to basic change detection only")
+# Hybrid AI imports - lazy loading for Railway deployment
+CLIP_AVAILABLE = False
+CLIP_IMPORT_ERROR = None
+
+def check_clip_availability():
+    """Check if CLIP is available without importing heavy dependencies"""
+    global CLIP_AVAILABLE, CLIP_IMPORT_ERROR
+    if CLIP_AVAILABLE:
+        return True
+    
+    try:
+        import torch
+        import clip
+        CLIP_AVAILABLE = True
+        print("✅ CLIP dependencies verified and available")
+        return True
+    except ImportError as e:
+        CLIP_AVAILABLE = False
+        CLIP_IMPORT_ERROR = str(e)
+        print(f"⚠️  CLIP dependencies not available: {e}")
+        print("   Will fall back to OpenCV-only detection")
+        return False
+    except Exception as e:
+        CLIP_AVAILABLE = False
+        CLIP_IMPORT_ERROR = str(e)
+        print(f"⚠️  CLIP check failed: {e}")
+        return False
 
 # Load environment variables
 load_dotenv()
@@ -240,7 +256,7 @@ def create_fastapi_with_mcp():
             "mcp_available": True,
             "hybrid_features": {
                 "semantic_analysis": semantic_analyzer is not None,
-                "change_classification": CLIP_AVAILABLE,
+                "change_classification": check_clip_availability(),
                 "threat_assessment": True
             }
         }
@@ -249,10 +265,10 @@ def create_fastapi_with_mcp():
     @app.post("/api/semantic-analysis")
     async def api_semantic_analysis(request: DetectChangesRequest):
         """REST API endpoint for CLIP semantic similarity analysis"""
-        if not semantic_analyzer or not CLIP_AVAILABLE:
+        if not semantic_analyzer:
             response_data = {
                 "success": False,
-                "error": "CLIP semantic analysis not available",
+                "error": "Semantic analyzer not available",
                 "available": False
             }
         else:
@@ -284,10 +300,10 @@ def create_fastapi_with_mcp():
     @app.post("/api/classify-change")
     async def api_classify_change(request: DetectChangesRequest):
         """REST API endpoint for CLIP change type classification"""
-        if not semantic_analyzer or not CLIP_AVAILABLE:
+        if not semantic_analyzer:
             response_data = {
                 "success": False,
-                "error": "CLIP change classification not available",
+                "error": "Semantic analyzer not available",
                 "available": False
             }
         else:
@@ -431,19 +447,19 @@ class ChangeDetector:
             semantic_results = {}
             classification_results = {}
             
-            if semantic_analyzer and CLIP_AVAILABLE:
-                # Semantic similarity analysis
+            if semantic_analyzer:
+                # Semantic similarity analysis (will handle lazy loading internally)
                 semantic_results = await semantic_analyzer.analyze_semantic_similarity(
                     before_image, after_image
                 )
                 
-                # Change type classification
+                # Change type classification (will handle lazy loading internally)
                 classification_results = await semantic_analyzer.classify_change_type(
                     before_image, after_image
                 )
             else:
-                semantic_results = {"available": False, "error": "CLIP not available"}
-                classification_results = {"available": False, "error": "CLIP not available"}
+                semantic_results = {"available": False, "error": "Semantic analyzer not initialized"}
+                classification_results = {"available": False, "error": "Semantic analyzer not initialized"}
             
             # Combine results and make final assessment
             final_assessment = self._assess_hybrid_results(
@@ -596,7 +612,11 @@ class CLIPSemanticAnalyzer:
     def __init__(self):
         self.model = None
         self.preprocess = None
-        self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        self.device = None
+        self.category_embeddings = {}
+        self.initialization_attempted = False
+        self.initialization_error = None
+        
         self.change_categories = [
             "building destruction", "building construction", "building damage",
             "vegetation loss", "vegetation growth", "deforestation",
@@ -608,13 +628,29 @@ class CLIPSemanticAnalyzer:
             "agricultural change", "crop harvesting", "farming activity"
         ]
         
-        if CLIP_AVAILABLE:
-            self._initialize_model()
+        # Don't initialize during startup - do it lazily when first needed
+        print("📱 CLIPSemanticAnalyzer created (lazy initialization)")
     
     def _initialize_model(self):
-        """Initialize CLIP model and preprocessing"""
+        """Initialize CLIP model and preprocessing (lazy loading)"""
+        if self.initialization_attempted:
+            return self.model is not None
+        
+        self.initialization_attempted = True
+        
         try:
+            # Check if CLIP is available first
+            if not check_clip_availability():
+                self.initialization_error = CLIP_IMPORT_ERROR or "CLIP not available"
+                return False
+            
+            # Now import the heavy dependencies
+            import torch
+            import clip
+            
             print("🧠 Initializing CLIP model for semantic analysis...")
+            self.device = "cuda" if torch.cuda.is_available() else "cpu"
+            
             # Use smaller ViT-B/32 model for better performance
             self.model, self.preprocess = clip.load("ViT-B/32", device=self.device)
             self.model.eval()
@@ -622,10 +658,13 @@ class CLIPSemanticAnalyzer:
             # Precompute text embeddings for change categories
             self.category_embeddings = self._precompute_category_embeddings()
             print(f"✅ CLIP model loaded on {self.device}")
+            return True
             
         except Exception as e:
             print(f"❌ Failed to initialize CLIP model: {e}")
+            self.initialization_error = str(e)
             self.model = None
+            return False
     
     def _precompute_category_embeddings(self):
         """Precompute embeddings for change categories"""
@@ -664,10 +703,11 @@ class CLIPSemanticAnalyzer:
     
     async def analyze_semantic_similarity(self, before_image: bytes, after_image: bytes) -> Dict[str, Any]:
         """Analyze semantic similarity between two images"""
-        if not self.model or not CLIP_AVAILABLE:
+        # Lazy initialization on first use
+        if not self._initialize_model():
             return {
                 "available": False,
-                "error": "CLIP model not available"
+                "error": f"CLIP model not available: {self.initialization_error or 'Unknown error'}"
             }
         
         try:
@@ -712,10 +752,11 @@ class CLIPSemanticAnalyzer:
     
     async def classify_change_type(self, before_image: bytes, after_image: bytes) -> Dict[str, Any]:
         """Classify the type of change using CLIP"""
-        if not self.model or not CLIP_AVAILABLE or not self.category_embeddings:
+        # Lazy initialization on first use
+        if not self._initialize_model():
             return {
                 "available": False,
-                "error": "CLIP classification not available"
+                "error": f"CLIP classification not available: {self.initialization_error or 'Unknown error'}"
             }
         
         try:
@@ -775,8 +816,8 @@ class CLIPSemanticAnalyzer:
         else:
             return "Very different - major changes or completely different scenes"
 
-# Initialize semantic analyzer
-semantic_analyzer = CLIPSemanticAnalyzer() if CLIP_AVAILABLE else None
+# Initialize semantic analyzer (lazy loading)
+semantic_analyzer = CLIPSemanticAnalyzer()  # Always create, will lazy-load CLIP when needed
 
 # Create the FastAPI app at module level for Railway
 app = None
@@ -1007,7 +1048,7 @@ async def detect_changes_hybrid_mcp(before_image_base64: str, after_image_base64
             "method": "hybrid_detection",
             "capabilities": {
                 "opencv_available": True,
-                "clip_available": CLIP_AVAILABLE,
+                "clip_available": check_clip_availability(),
                 "semantic_analysis": semantic_analyzer is not None
             }
         }
@@ -1029,7 +1070,7 @@ async def health_check() -> Dict[str, Any]:
         "version": "0.1.0",
         "capabilities": {
             "opencv": True,
-            "clip": CLIP_AVAILABLE,
+            "clip": check_clip_availability(),  # Check lazily
             "semantic_analysis": semantic_analyzer is not None,
             "hybrid_detection": True
         }

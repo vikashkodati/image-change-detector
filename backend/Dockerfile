@@ -24,8 +24,9 @@ COPY backend/pyproject.toml backend/uv.lock ./backend/
 # Change to backend directory for UV operations
 WORKDIR /app/backend
 
-# Install Python dependencies
-RUN uv sync --frozen
+# Install Python dependencies (basic + AI optional)
+RUN uv sync --frozen && \
+    uv sync --frozen --extra ai || echo "⚠️  AI dependencies failed to install - will run with basic features only"
 
 # Copy source code
 COPY backend/src/ ./src/
@@ -39,8 +40,8 @@ ENV PYTHONPATH=/app/backend/src
 # Expose port
 EXPOSE 8000
 
-# Add health check
-HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
+# Add health check with longer timeout for AI loading
+HEALTHCHECK --interval=30s --timeout=60s --start-period=30s --retries=3 \
   CMD curl -f http://localhost:8000/api/health || exit 1
 
 # Run the application using UV
