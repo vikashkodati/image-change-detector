@@ -352,7 +352,7 @@ export default function Home() {
                                 THREAT LEVEL: {results.results.final_assessment.threat_level}
                               </div>
                               <div className="matrix-text text-lg mt-2">
-                                CONFIDENCE: {(results.results.final_assessment.confidence * 100).toFixed(0)}%
+                                CONFIDENCE: {((results.results.final_assessment.confidence || 0) * 100).toFixed(0)}%
                               </div>
                             </div>
                           </div>
@@ -378,7 +378,7 @@ export default function Home() {
                               </div>
                               <div className="matrix-border p-3 rounded bg-black/50">
                                 <div className="matrix-text font-mono text-sm">
-                                  <span className="text-green-400">ANALYSIS:</span> {results.results.final_assessment.reasoning}
+                                  <span className="text-green-400">ANALYSIS:</span> {results.results.final_assessment.reasoning || 'No analysis available'}
                                 </div>
                               </div>
                             </div>
@@ -393,20 +393,20 @@ export default function Home() {
                               <div className="grid grid-cols-2 gap-4 text-center">
                                 <div className="matrix-border p-3 rounded bg-black/50">
                                   <div className="matrix-text text-3xl font-bold matrix-pulse">
-                                    {results.results.opencv_results.change_percentage.toFixed(2)}%
+                                    {(results.results.opencv_results.change_percentage || 0).toFixed(2)}%
                                   </div>
                                   <div className="matrix-text text-sm opacity-70">PIXEL CHANGE</div>
                                 </div>
                                 <div className="matrix-border p-3 rounded bg-black/50">
                                   <div className="matrix-text text-3xl font-bold matrix-pulse">
-                                    {results.results.opencv_results.contours_count}
+                                    {results.results.opencv_results.contours_count || 0}
                                   </div>
                                   <div className="matrix-text text-sm opacity-70">REGIONS</div>
                                 </div>
                               </div>
                               <div className="mt-4 matrix-border p-3 rounded bg-black/50">
                                 <div className="matrix-text font-mono text-sm">
-                                  PIXELS: {results.results.opencv_results.changed_pixels.toLocaleString()} / {results.results.opencv_results.total_pixels.toLocaleString()}
+                                  PIXELS: {(results.results.opencv_results.changed_pixels || 0).toLocaleString()} / {(results.results.opencv_results.total_pixels || 0).toLocaleString()}
                                 </div>
                               </div>
                             </div>
@@ -422,7 +422,7 @@ export default function Home() {
                                 <div className="matrix-border p-3 rounded bg-black/50">
                                   <div className="matrix-text font-mono">
                                     <span className="text-green-400">SIMILARITY:</span> {
-                                      (results.results.semantic_results.semantic_similarity! * 100).toFixed(1)
+                                      ((results.results.semantic_results.semantic_similarity || 0) * 100).toFixed(1)
                                     }%
                                   </div>
                                 </div>
@@ -488,12 +488,12 @@ export default function Home() {
                               <div className="grid grid-cols-2 gap-4">
                                 <div className="matrix-border p-3 rounded bg-black/50">
                                   <div className="matrix-text font-mono text-sm">
-                                    <span className="text-green-400">OPENCV:</span> {results.results.processing_time.opencv_stage}
+                                    <span className="text-green-400">OPENCV:</span> {results.results.processing_time?.opencv_stage || 'N/A'}
                                   </div>
                                 </div>
                                 <div className="matrix-border p-3 rounded bg-black/50">
                                   <div className="matrix-text font-mono text-sm">
-                                    <span className="text-green-400">CLIP:</span> {results.results.processing_time.clip_stage}
+                                    <span className="text-green-400">CLIP:</span> {results.results.processing_time?.clip_stage || 'N/A'}
                                   </div>
                                 </div>
                               </div>
