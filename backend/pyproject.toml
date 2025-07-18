@@ -18,14 +18,17 @@ dependencies = [
     "rasterio>=1.3.0",
     "aiohttp>=3.12.14",
     "pydantic>=2.11.7",
-]
-
-[project.optional-dependencies]
-# Hybrid AI features - install separately for enhanced capabilities
-ai = [
+    # AI dependencies - moved to main for Railway deployment
     "torch>=2.0.0,<2.3.0",
     "torchvision>=0.15.0,<0.18.0", 
     "ftfy",
     "regex",
-    # Install CLIP via git since pip package has conflicts
+]
+
+[project.optional-dependencies]
+# Development dependencies
+dev = [
+    "pytest>=7.0.0",
+    "black>=23.0.0",
+    "ruff>=0.1.0",
 ]

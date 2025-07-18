@@ -155,8 +155,31 @@ def create_fastapi_with_mcp():
                     
             elif processing_mode == "clip_only":
                 # Pure CLIP semantic analysis (without pixel filtering)
-                results = await detector.detect_changes_clip_only(before_bytes, after_bytes)
-                method_used = "clip_only"
+                if not semantic_analyzer or not check_clip_availability():
+                    # Fallback to OpenCV if CLIP is not available
+                    print(f"   ⚠️  CLIP not available, falling back to OpenCV for CLIP_ONLY request")
+                    results = await detector.detect_changes(before_bytes, after_bytes)
+                    method_used = "opencv_fallback"
+                    
+                    # Format as OpenCV-only results with warning
+                    if "error" not in results:
+                        results = {
+                            "hybrid_available": False,
+                            "method": "opencv_fallback",
+                            "opencv_results": results,
+                            "semantic_results": {"available": False, "error": "CLIP not available - fell back to OpenCV"},
+                            "final_assessment": {
+                                "has_meaningful_change": results.get("change_percentage", 0) > 2.0,
+                                "confidence": 0.7,
+                                "reasoning": f"CLIP unavailable - OpenCV fallback: {results.get('change_percentage', 0):.2f}% pixel changes",
+                                "change_type": "pixel_based_fallback",
+                                "threat_level": "MEDIUM" if results.get("change_percentage", 0) > 5.0 else "LOW"
+                            },
+                            "warning": "CLIP was requested but not available - using OpenCV fallback"
+                        }
+                else:
+                    results = await detector.detect_changes_clip_only(before_bytes, after_bytes)
+                    method_used = "clip_only"
                 
             else:
                 # Default: Hybrid detection (OpenCV + CLIP)

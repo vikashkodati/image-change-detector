@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -141,9 +141,26 @@ export default function Home() {
   } | null>(null);
   const [selectedSample, setSelectedSample] = useState<number | null>(null);
   const [processingMode, setProcessingMode] = useState<string>("hybrid");
+  const [clipStatus, setClipStatus] = useState<any>(null);
 
   // API URL for both local and production
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
+
+  // Check CLIP status on component load
+  useEffect(() => {
+    const checkClipStatus = async () => {
+      try {
+        const response = await fetch(`${API_URL}/api/clip-status`);
+        const data = await response.json();
+        setClipStatus(data);
+      } catch (error) {
+        console.error('Failed to check CLIP status:', error);
+        setClipStatus({ error: 'Failed to check CLIP status' });
+      }
+    };
+    
+    checkClipStatus();
+  }, [API_URL]);
 
   // Processing mode configuration
   const processingModes = [
@@ -406,6 +423,30 @@ export default function Home() {
                 <Label className="matrix-text text-lg font-mono block mb-4">
                   &gt; PROCESSING MODE CONFIGURATION:
                 </Label>
+                                 <div className="matrix-border p-3 rounded-lg bg-green-900/10 mb-4">
+                   <p className="matrix-text font-mono text-sm opacity-80">
+                     🎯 <span className="text-green-400">DEFAULT MODE:</span> Hybrid AI combines OpenCV precision with CLIP semantic understanding for optimal results
+                   </p>
+                   <div className="flex items-center justify-between mt-2">
+                     <Button
+                       variant="outline"
+                       size="sm"
+                       onClick={() => setProcessingMode("hybrid")}
+                       className="text-xs"
+                     >
+                       🔄 RESET TO DEFAULT (HYBRID)
+                     </Button>
+                     {clipStatus && (
+                       <div className={`px-2 py-1 rounded text-xs font-mono ${
+                         clipStatus.clip_available_flag ? 
+                           'bg-green-900/50 text-green-300 border border-green-500' :
+                           'bg-red-900/50 text-red-300 border border-red-500'
+                       }`}>
+                         {clipStatus.clip_available_flag ? '✅ CLIP AVAILABLE' : '❌ CLIP UNAVAILABLE'}
+                       </div>
+                     )}
+                   </div>
+                 </div>
                 <div className="space-y-3">
                   {processingModes.map((mode) => (
                     <div
@@ -429,9 +470,18 @@ export default function Home() {
                               onChange={(e) => setProcessingMode(e.target.value)}
                               className="w-4 h-4 text-green-400 bg-black border-green-400 focus:ring-green-400"
                             />
-                            <h3 className="matrix-text font-mono font-bold text-lg">
-                              {mode.name}
-                            </h3>
+                                                       <h3 className="matrix-text font-mono font-bold text-lg">
+                             {mode.name}
+                           </h3>
+                           {(mode.id === 'hybrid' || mode.id === 'clip_only') && (
+                             <div className={`ml-2 px-2 py-1 rounded text-xs font-mono ${
+                               clipStatus?.clip_available_flag ? 
+                                 'bg-green-900/50 text-green-300 border border-green-500' :
+                                 'bg-red-900/50 text-red-300 border border-red-500'
+                             }`}>
+                               {clipStatus?.clip_available_flag ? '🧠 CLIP OK' : '⚠️ CLIP NEEDED'}
+                             </div>
+                           )}
                           </div>
                           <p className="matrix-text opacity-70 text-sm mt-2 ml-7">
                             {mode.description}

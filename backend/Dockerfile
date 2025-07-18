@@ -25,12 +25,11 @@ COPY backend/pyproject.toml backend/uv.lock ./backend/
 # Change to backend directory for UV operations
 WORKDIR /app/backend
 
-# Install basic Python dependencies first
+# Install Python dependencies including AI packages
 RUN uv sync --frozen
 
-# Install AI dependencies separately with graceful handling
-RUN uv sync --frozen --extra ai && \
-    uv pip install "git+https://github.com/openai/CLIP.git" || \
+# Install CLIP from git (separate step for better error handling)
+RUN uv pip install "git+https://github.com/openai/CLIP.git" || \
     echo "⚠️  CLIP installation failed - will run with OpenCV-only mode"
 
 # Copy source code
