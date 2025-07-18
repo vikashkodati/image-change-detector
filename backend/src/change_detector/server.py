@@ -82,6 +82,7 @@ mcp = FastMCP("Image Change Detector Server")
 class DetectChangesRequest(BaseModel):
     before_image_base64: str
     after_image_base64: str
+    processing_mode: str = "hybrid"  # Options: "hybrid", "opencv_only", "clip_only"
 
 class AnalyzeChangesRequest(BaseModel):
     before_image_base64: str
@@ -122,27 +123,60 @@ def create_fastapi_with_mcp():
     # REST API endpoints that call MCP tool functions
     @app.post("/api/detect-changes")
     async def api_detect_changes(request: DetectChangesRequest):
-        """REST API endpoint that calls the same logic as MCP detect_image_changes tool"""
+        """REST API endpoint with configurable processing modes"""
         try:
             # Decode base64 images
             before_bytes = base64.b64decode(request.before_image_base64)
             after_bytes = base64.b64decode(request.after_image_base64)
             
-            # Perform hybrid change detection (OpenCV + CLIP)
-            results = await detector.detect_changes_hybrid(before_bytes, after_bytes)
+            # Route to appropriate detection method based on processing_mode
+            processing_mode = request.processing_mode.lower()
+            
+            if processing_mode == "opencv_only":
+                # Pure OpenCV pixel-based detection
+                results = await detector.detect_changes(before_bytes, after_bytes)
+                method_used = "opencv_only"
+                
+                # Format results to match hybrid structure for consistency
+                if "error" not in results:
+                    results = {
+                        "hybrid_available": False,
+                        "method": "opencv_only",
+                        "opencv_results": results,
+                        "semantic_results": {"available": False, "reason": "OpenCV-only mode selected"},
+                        "final_assessment": {
+                            "has_meaningful_change": results.get("change_percentage", 0) > 2.0,
+                            "confidence": 0.8,
+                            "reasoning": f"OpenCV-only: {results.get('change_percentage', 0):.2f}% pixel changes",
+                            "change_type": "pixel_based_detection",
+                            "threat_level": "MEDIUM" if results.get("change_percentage", 0) > 5.0 else "LOW"
+                        }
+                    }
+                    
+            elif processing_mode == "clip_only":
+                # Pure CLIP semantic analysis (without pixel filtering)
+                results = await detector.detect_changes_clip_only(before_bytes, after_bytes)
+                method_used = "clip_only"
+                
+            else:
+                # Default: Hybrid detection (OpenCV + CLIP)
+                results = await detector.detect_changes_hybrid(before_bytes, after_bytes)
+                method_used = "hybrid_detection"
             
             # Check if the detection had errors
             if "error" in results:
                 response_data = {
                     "success": False,
                     "error": results["error"],
-                    "method": "hybrid_detection"
+                    "method": method_used,
+                    "processing_mode": processing_mode
                 }
             else:
                 response_data = {
                     "success": True,
                     "results": results,
-                    "method": "hybrid_detection",
+                    "method": method_used,
+                    "processing_mode": processing_mode,
                     "enhanced_features": {
                         "semantic_analysis": results.get("semantic_results", {}).get("available", False),
                         "change_classification": results.get("classification_results", {}).get("available", False),
@@ -158,7 +192,8 @@ def create_fastapi_with_mcp():
         except Exception as e:
             response_data = {
                 "success": False,
-                "error": str(e)
+                "error": str(e),
+                "processing_mode": request.processing_mode
             }
             response = JSONResponse(content=response_data)
             response.headers["Access-Control-Allow-Origin"] = "*"
@@ -641,6 +676,116 @@ class ChangeDetector:
                 "reasoning": f"Low pixel changes ({change_percentage:.2f}%) - insufficient for meaningful change",
                 "change_type": "no_change",
                 "threat_level": "NONE"
+            }
+        
+        return result
+    
+    async def detect_changes_clip_only(self, before_image: bytes, after_image: bytes) -> Dict[str, Any]:
+        """
+        Pure CLIP semantic analysis without pixel filtering
+        """
+        try:
+            print("🧠 Starting CLIP-only semantic detection...")
+            
+            # Stage 1: Direct CLIP semantic analysis
+            semantic_results = {}
+            classification_results = {}
+            
+            if semantic_analyzer:
+                print("   🔍 Performing semantic similarity analysis...")
+                semantic_results = await semantic_analyzer.analyze_semantic_similarity(
+                    before_image, after_image
+                )
+                
+                print("   🏷️  Performing change type classification...")
+                classification_results = await semantic_analyzer.classify_change_type(
+                    before_image, after_image
+                )
+            else:
+                return {
+                    "hybrid_available": False,
+                    "error": "CLIP semantic analyzer not available",
+                    "method": "clip_only"
+                }
+            
+            # Make assessment based purely on semantic analysis
+            final_assessment = self._assess_clip_only_results(semantic_results, classification_results)
+            
+            print(f"   CLIP-only assessment: {final_assessment['has_meaningful_change']} (confidence: {final_assessment['confidence']})")
+            
+            return {
+                "hybrid_available": True,
+                "method": "clip_only",
+                "opencv_results": {"available": False, "reason": "CLIP-only mode selected"},
+                "semantic_results": semantic_results,
+                "classification_results": classification_results,
+                "final_assessment": final_assessment,
+                "processing_time": {
+                    "opencv_stage": "skipped",
+                    "clip_stage": "~200ms" if semantic_results.get("available") else "failed"
+                }
+            }
+            
+        except Exception as e:
+            return {
+                "hybrid_available": True,
+                "error": f"CLIP-only detection failed: {str(e)}",
+                "method": "clip_only"
+            }
+    
+    def _assess_clip_only_results(self, semantic_results: Dict, classification_results: Dict) -> Dict[str, Any]:
+        """Assess results based purely on CLIP semantic analysis"""
+        
+        # If CLIP is not available, return error
+        if not semantic_results.get("available", False):
+            return {
+                "has_meaningful_change": False,
+                "confidence": 0.0,
+                "reasoning": f"CLIP semantic analysis failed: {semantic_results.get('error', 'Unknown error')}",
+                "change_type": "unknown",
+                "threat_level": "UNKNOWN"
+            }
+        
+        # Get CLIP semantic analysis
+        semantic_similarity = semantic_results.get("semantic_similarity", 1.0)
+        is_meaningful = semantic_results.get("is_meaningful_change", False)
+        change_confidence = semantic_results.get("change_confidence", 0.0)
+        
+        # Get classification results
+        most_likely_change = classification_results.get("most_likely", "unknown")
+        max_confidence = classification_results.get("max_confidence", 0.0)
+        
+        # Decision logic: Pure semantic analysis
+        if is_meaningful and change_confidence > 0.1:
+            # CLIP detected meaningful semantic differences
+            confidence = min(0.95, 0.7 + change_confidence * 0.25)
+            reasoning = f"CLIP semantic analysis: similarity {semantic_similarity:.3f}, confidence {change_confidence:.3f}"
+            threat_level = self._determine_threat_level(most_likely_change, max_confidence)
+            
+            result = {
+                "has_meaningful_change": True,
+                "confidence": confidence,
+                "reasoning": reasoning,
+                "change_type": most_likely_change,
+                "threat_level": threat_level
+            }
+        elif semantic_similarity > 0.95:
+            # Very high similarity - likely no meaningful change
+            result = {
+                "has_meaningful_change": False,
+                "confidence": 0.90,
+                "reasoning": f"CLIP semantic analysis: very high similarity ({semantic_similarity:.3f}) indicates no meaningful change",
+                "change_type": "no_change",
+                "threat_level": "NONE"
+            }
+        else:
+            # Moderate similarity but low confidence - uncertain
+            result = {
+                "has_meaningful_change": False,
+                "confidence": 0.60,
+                "reasoning": f"CLIP semantic analysis: moderate similarity ({semantic_similarity:.3f}) but low confidence ({change_confidence:.3f})",
+                "change_type": "uncertain",
+                "threat_level": "LOW"
             }
         
         return result

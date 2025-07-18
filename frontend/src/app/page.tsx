@@ -83,6 +83,7 @@ export default function Home() {
   const [results, setResults] = useState<{
     success: boolean;
     method?: string;
+    processing_mode?: string;
     results?: {
       // OpenCV results (legacy compatibility)
       change_percentage?: number;
@@ -139,9 +140,38 @@ export default function Home() {
     error?: string;
   } | null>(null);
   const [selectedSample, setSelectedSample] = useState<number | null>(null);
+  const [processingMode, setProcessingMode] = useState<string>("hybrid");
 
   // API URL for both local and production
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
+
+  // Processing mode configuration
+  const processingModes = [
+    {
+      id: "hybrid",
+      name: "🧠 Hybrid AI (Default)",
+      description: "OpenCV pixel detection + CLIP semantic analysis",
+      performance: "~300ms",
+      accuracy: "Highest - Combines pixel precision with semantic understanding",
+      useCase: "Best for most scenarios - filters pixel noise with AI validation"
+    },
+    {
+      id: "clip_only", 
+      name: "🎯 CLIP Semantic Only",
+      description: "Pure AI semantic analysis without pixel filtering",
+      performance: "~200ms",
+      accuracy: "High semantic - May miss subtle pixel changes",
+      useCase: "Best for detecting conceptual changes (land use, objects, etc.)"
+    },
+    {
+      id: "opencv_only",
+      name: "📊 OpenCV Pixel Only",
+      description: "Traditional pixel-based change detection",
+      performance: "~100ms",
+      accuracy: "High pixel precision - May produce false positives",
+      useCase: "Best for detecting precise pixel changes, fastest processing"
+    }
+  ];
 
   // Convert File to base64 string
   const fileToBase64 = (file: File): Promise<string> => {
@@ -178,6 +208,7 @@ export default function Home() {
         body: JSON.stringify({
           before_image_base64: beforeBase64,
           after_image_base64: afterBase64,
+          processing_mode: processingMode,
         }),
       });
 
@@ -370,6 +401,65 @@ export default function Home() {
                 </div>
               </div>
 
+              {/* Processing Mode Selection */}
+              <div className="mb-6">
+                <Label className="matrix-text text-lg font-mono block mb-4">
+                  &gt; PROCESSING MODE CONFIGURATION:
+                </Label>
+                <div className="space-y-3">
+                  {processingModes.map((mode) => (
+                    <div
+                      key={mode.id}
+                      className={`p-4 rounded-lg border-2 cursor-pointer transition-all duration-300 ${
+                        processingMode === mode.id
+                          ? 'matrix-glow border-green-400 bg-green-900/20'
+                          : 'matrix-border hover:border-green-400 hover:bg-green-900/10'
+                      }`}
+                      onClick={() => setProcessingMode(mode.id)}
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center space-x-3">
+                            <input
+                              type="radio"
+                              id={mode.id}
+                              name="processing-mode"
+                              value={mode.id}
+                              checked={processingMode === mode.id}
+                              onChange={(e) => setProcessingMode(e.target.value)}
+                              className="w-4 h-4 text-green-400 bg-black border-green-400 focus:ring-green-400"
+                            />
+                            <h3 className="matrix-text font-mono font-bold text-lg">
+                              {mode.name}
+                            </h3>
+                          </div>
+                          <p className="matrix-text opacity-70 text-sm mt-2 ml-7">
+                            {mode.description}
+                          </p>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-3 ml-7">
+                            <div className="matrix-border rounded p-2 bg-black/50">
+                              <span className="matrix-text text-xs font-mono">
+                                ⚡ <span className="text-green-400">PERFORMANCE:</span> {mode.performance}
+                              </span>
+                            </div>
+                            <div className="matrix-border rounded p-2 bg-black/50">
+                              <span className="matrix-text text-xs font-mono">
+                                🎯 <span className="text-green-400">ACCURACY:</span> {mode.accuracy}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="matrix-border rounded p-2 mt-2 ml-7 bg-green-900/10">
+                            <span className="matrix-text text-xs font-mono opacity-80">
+                              💡 <span className="text-green-400">USE CASE:</span> {mode.useCase}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
               {/* File Upload Section */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -441,16 +531,32 @@ export default function Home() {
                 <div className="space-y-6">
                   {results.success && results.results ? (
                     <>
-                      {/* Method Detection Banner */}
+                      {/* Processing Mode Banner */}
                       <div className={`matrix-border p-3 rounded-lg ${
-                        results.method === 'hybrid_detection' ? 'bg-green-900/20' : 'bg-blue-900/20'
+                        results.method === 'hybrid_detection' ? 'bg-green-900/20' :
+                        results.method === 'clip_only' ? 'bg-purple-900/20' :
+                        results.method === 'opencv_only' ? 'bg-blue-900/20' : 'bg-gray-900/20'
                       }`}>
                         <div className="matrix-text text-center font-mono">
                           {results.method === 'hybrid_detection' ? 
-                            '🧠 HYBRID AI ANALYSIS: OpenCV + CLIP Semantic Detection' : 
-                            '🔍 LEGACY ANALYSIS: OpenCV Only'
+                            '🧠 HYBRID AI ANALYSIS: OpenCV + CLIP Semantic Detection' :
+                          results.method === 'clip_only' ?
+                            '🎯 CLIP SEMANTIC ANALYSIS: Pure AI Semantic Understanding' :
+                          results.method === 'opencv_only' ?
+                            '📊 OPENCV PIXEL ANALYSIS: Traditional Pixel-Based Detection' :
+                            '🔍 ANALYSIS COMPLETE'
                           }
                         </div>
+                        {results.processing_mode && (
+                          <div className="matrix-text text-center font-mono text-sm opacity-70 mt-1">
+                            MODE: {results.processing_mode.toUpperCase()} | 
+                            PERFORMANCE: {
+                              results.processing_mode === 'hybrid' ? '~300ms' :
+                              results.processing_mode === 'clip_only' ? '~200ms' :
+                              results.processing_mode === 'opencv_only' ? '~100ms' : 'Variable'
+                            }
+                          </div>
+                        )}
                       </div>
 
                       {/* Enhanced Hybrid Results */}
