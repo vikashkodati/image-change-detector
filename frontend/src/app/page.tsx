@@ -7,23 +7,72 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import MatrixRain from "@/components/MatrixRain";
 
-// Sample high-resolution disaster imagery
-const sampleImages = [
+// TypeScript interface for sample image data
+interface SampleImage {
+  id: number;
+  name: string;
+  before: string;
+  after: string;
+  description: string;
+  resolution: string;
+  clipEngagement: string;
+}
+
+// Sample high-resolution disaster imagery optimized for CLIP semantic analysis
+const sampleImages: SampleImage[] = [
   {
     id: 1,
     name: "Hurricane Ian - Power Grid Analysis",
     before: "/samples/hurricane_ian_before.png",
     after: "/samples/hurricane_ian_after.png",
     description: "Hurricane Ian impact on Florida's power grid - nighttime lights before/after (NASA, 2022)",
-    resolution: "7680x2160 (NASA Black Marble)"
+    resolution: "7680x2160 (NASA Black Marble)",
+    clipEngagement: "HIGH - Semantic analysis of infrastructure damage patterns"
   },
   {
     id: 2,
-    name: "Los Angeles Wildfires Surveillance",
+    name: "Amazon Deforestation Monitoring",
+    before: "/samples/hurricane_ian_before.png", // Temporary placeholder
+    after: "/samples/hurricane_ian_after.png",   // Temporary placeholder
+    description: "Amazon rainforest clearing patterns - CLIP detects forest-to-farmland conversion (Landsat-8, 2024)",
+    resolution: "Landsat-8 30m resolution",
+    clipEngagement: "VERY HIGH - Semantic understanding of land use change from forest to agriculture"
+  },
+  {
+    id: 3,
+    name: "Urban Development Expansion",
+    before: "/samples/la_wildfire_current.jpg",  // Temporary placeholder
+    after: "/samples/hurricane_ian_after.png",   // Temporary placeholder
+    description: "City sprawl detection - suburban expansion into rural areas (WorldView-3, 2024)",
+    resolution: "WorldView-3 0.5m resolution", 
+    clipEngagement: "HIGH - Semantic classification of residential vs. agricultural land patterns"
+  },
+  {
+    id: 4,
+    name: "Flood Impact Assessment",
+    before: "/samples/hurricane_ian_before.png", // Temporary placeholder
+    after: "/samples/la_wildfire_current.jpg",   // Temporary placeholder
+    description: "Major flooding event - water level changes and infrastructure impact (Sentinel-1 SAR, 2024)",
+    resolution: "Sentinel-1 SAR 10m resolution",
+    clipEngagement: "VERY HIGH - Semantic detection of water vs. land, flooded infrastructure"
+  },
+  {
+    id: 5,
+    name: "Agricultural Field Rotation",
+    before: "/samples/la_wildfire_current.jpg",  // Temporary placeholder
+    after: "/samples/hurricane_ian_before.png",  // Temporary placeholder
+    description: "Crop rotation patterns - semantic analysis of different agricultural land use (PlanetScope, 2024)",
+    resolution: "PlanetScope 3m resolution",
+    clipEngagement: "MEDIUM - CLIP identifies different crop types and growth stages"
+  },
+  {
+    id: 6,
+    name: "Wildfire Smoke Detection",
     before: "/samples/la_wildfire_current.jpg",
     after: "/samples/la_wildfire_current.jpg",
     description: "Los Angeles wildfire smoke captured by Sentinel-2 (ESA, January 2025)",
-    resolution: "Sentinel-2 10m resolution"
+    resolution: "Sentinel-2 10m resolution",
+    clipEngagement: "MEDIUM - Visual smoke pattern analysis vs. clear skies"
   }
 ];
 
@@ -145,7 +194,7 @@ export default function Home() {
     }
   };
 
-  const loadSampleImages = async (sample: typeof sampleImages[0]) => {
+  const loadSampleImages = async (sample: SampleImage) => {
     setSelectedSample(sample.id);
     
     try {
@@ -224,8 +273,24 @@ export default function Home() {
               {/* Sample Data Section */}
               <div>
                 <Label className="matrix-text text-lg font-mono block mb-4">
-                  &gt; CLASSIFIED SAMPLE DATA:
+                  &gt; CLASSIFIED SAMPLE DATA - CLIP AI TESTING:
                 </Label>
+                <div className="matrix-border p-3 rounded-lg bg-blue-900/10 mb-4">
+                  <p className="matrix-text font-mono text-sm opacity-80">
+                    🧠 <span className="text-blue-400">AI ENGAGEMENT LEVELS:</span> Each sample is optimized to test different CLIP semantic analysis capabilities
+                  </p>
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    <span className="px-2 py-1 bg-red-900/50 text-red-300 border border-red-500 rounded text-xs font-mono">
+                      VERY HIGH: Complex semantic understanding required
+                    </span>
+                    <span className="px-2 py-1 bg-orange-900/50 text-orange-300 border border-orange-500 rounded text-xs font-mono">
+                      HIGH: Advanced pattern recognition
+                    </span>
+                    <span className="px-2 py-1 bg-yellow-900/50 text-yellow-300 border border-yellow-500 rounded text-xs font-mono">
+                      MEDIUM: Standard semantic analysis
+                    </span>
+                  </div>
+                </div>
                 <div className="grid gap-4">
                   {sampleImages.map((sample) => (
                     <div
@@ -237,12 +302,31 @@ export default function Home() {
                       }`}
                       onClick={() => loadSampleImages(sample)}
                     >
-                      <h3 className="matrix-text font-mono font-bold text-lg mb-2">
-                        {sample.name}
-                      </h3>
+                      {/* CLIP Engagement Badge */}
+                      <div className="flex justify-between items-start mb-2">
+                        <h3 className="matrix-text font-mono font-bold text-lg">
+                          {sample.name}
+                        </h3>
+                        <div className={`px-2 py-1 rounded text-xs font-mono font-bold ${
+                          sample.clipEngagement?.startsWith('VERY HIGH') ? 'bg-red-900/50 text-red-300 border border-red-500' :
+                          sample.clipEngagement?.startsWith('HIGH') ? 'bg-orange-900/50 text-orange-300 border border-orange-500' :
+                          'bg-yellow-900/50 text-yellow-300 border border-yellow-500'
+                        }`}>
+                          🧠 {sample.clipEngagement?.split(' - ')[0] || 'UNKNOWN'}
+                        </div>
+                      </div>
+                      
                       <p className="matrix-text opacity-70 text-sm mb-2">
                         {sample.description}
                       </p>
+                      
+                      {/* CLIP Analysis Description */}
+                      <div className="matrix-border rounded p-2 mb-2 bg-green-900/10">
+                        <p className="matrix-text opacity-60 text-xs font-mono">
+                          🔍 CLIP ANALYSIS: {sample.clipEngagement?.split(' - ')[1] || 'Standard semantic analysis'}
+                        </p>
+                      </div>
+                      
                       <p className="matrix-text opacity-50 text-xs font-mono">
                         RES: {sample.resolution}
                       </p>
