@@ -13,6 +13,7 @@ from PIL import Image
 from fastmcp import FastMCP
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from openai import OpenAI
@@ -57,18 +58,27 @@ def create_fastapi_with_mcp():
     app = FastAPI(title="Image Change Detector API (MCP-powered)")
     
     # Add CORS middleware - allow all origins for public deployment
+    # More explicit CORS configuration for Railway
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=[
-            "https://image-change-detector.vercel.app",
-            "http://localhost:3000",
-            "http://localhost:3001",
-            "https://railway.com"  # Railway seems to enforce this
-        ],
-        allow_credentials=True,
+        allow_origins=["*"],  # Go back to wildcard - Railway issue
+        allow_credentials=False,
         allow_methods=["GET", "POST", "OPTIONS", "PUT", "DELETE"],
         allow_headers=["*"],
+        allow_origin_regex=None,
     )
+    
+    # Add explicit OPTIONS handling for preflight requests
+    @app.options("/api/{path:path}")
+    async def options_handler(path: str):
+        return {
+            "message": "OK",
+            "headers": {
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+                "Access-Control-Allow-Headers": "*"
+            }
+        }
     
     # REST API endpoints that call MCP tool functions
     @app.post("/api/detect-changes")
@@ -89,16 +99,26 @@ def create_fastapi_with_mcp():
                     "error": results["error"]
                 }
             
-            return {
+            response_data = {
                 "success": True,
                 "results": results
             }
+            response = JSONResponse(content=response_data)
+            response.headers["Access-Control-Allow-Origin"] = "*"
+            response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
+            response.headers["Access-Control-Allow-Headers"] = "*"
+            return response
             
         except Exception as e:
-            return {
+            response_data = {
                 "success": False,
                 "error": str(e)
             }
+            response = JSONResponse(content=response_data)
+            response.headers["Access-Control-Allow-Origin"] = "*"
+            response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
+            response.headers["Access-Control-Allow-Headers"] = "*"
+            return response
     
     @app.post("/api/analyze-changes")
     async def api_analyze_changes(request: AnalyzeChangesRequest):
