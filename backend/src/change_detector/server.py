@@ -23,28 +23,39 @@ from dotenv import load_dotenv
 CLIP_AVAILABLE = False
 CLIP_IMPORT_ERROR = None
 
+# Try to import torch for type annotations (but don't fail if not available)
+try:
+    import torch
+    import clip
+    TORCH_AVAILABLE = True
+except ImportError:
+    torch = None
+    clip = None
+    TORCH_AVAILABLE = False
+
 def check_clip_availability():
     """Check if CLIP is available without importing heavy dependencies"""
     global CLIP_AVAILABLE, CLIP_IMPORT_ERROR
     if CLIP_AVAILABLE:
         return True
     
-    try:
-        import torch
-        import clip
-        CLIP_AVAILABLE = True
-        print("✅ CLIP dependencies verified and available")
-        return True
-    except ImportError as e:
+    if TORCH_AVAILABLE and torch is not None and clip is not None:
+        try:
+            # Test that we can actually use the models
+            _ = torch.cuda.is_available()  # Basic torch test
+            CLIP_AVAILABLE = True
+            print("✅ CLIP dependencies verified and available")
+            return True
+        except Exception as e:
+            CLIP_AVAILABLE = False
+            CLIP_IMPORT_ERROR = str(e)
+            print(f"⚠️  CLIP runtime check failed: {e}")
+            return False
+    else:
         CLIP_AVAILABLE = False
-        CLIP_IMPORT_ERROR = str(e)
-        print(f"⚠️  CLIP dependencies not available: {e}")
+        CLIP_IMPORT_ERROR = "CLIP dependencies not imported"
+        print(f"⚠️  CLIP dependencies not available")
         print("   Will fall back to OpenCV-only detection")
-        return False
-    except Exception as e:
-        CLIP_AVAILABLE = False
-        CLIP_IMPORT_ERROR = str(e)
-        print(f"⚠️  CLIP check failed: {e}")
         return False
 
 # Load environment variables
@@ -687,7 +698,7 @@ class CLIPSemanticAnalyzer:
             print(f"⚠️  Failed to precompute category embeddings: {e}")
             return {}
     
-    def _preprocess_image(self, image_bytes: bytes) -> torch.Tensor:
+    def _preprocess_image(self, image_bytes: bytes) -> "torch.Tensor":
         """Preprocess image for CLIP"""
         try:
             # Convert bytes to PIL Image
