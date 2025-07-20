@@ -18,63 +18,36 @@ interface SampleImage {
   clipEngagement: string;
 }
 
-// Sample high-resolution disaster imagery optimized for CLIP semantic analysis
-const sampleImages: SampleImage[] = [
-  {
-    id: 1,
-    name: "Hurricane Ian - Power Grid Analysis",
-    before: "/samples/hurricane_ian_before.png",
-    after: "/samples/hurricane_ian_after.png",
-    description: "Hurricane Ian impact on Florida's power grid - nighttime lights before/after (NASA, 2022)",
-    resolution: "7680x2160 (NASA Black Marble)",
-    clipEngagement: "HIGH - Semantic analysis of infrastructure damage patterns"
-  },
-  {
-    id: 2,
-    name: "Amazon Deforestation Monitoring",
-    before: "/samples/hurricane_ian_before.png", // Temporary placeholder
-    after: "/samples/hurricane_ian_after.png",   // Temporary placeholder
-    description: "Amazon rainforest clearing patterns - CLIP detects forest-to-farmland conversion (Landsat-8, 2024)",
-    resolution: "Landsat-8 30m resolution",
-    clipEngagement: "VERY HIGH - Semantic understanding of land use change from forest to agriculture"
-  },
-  {
-    id: 3,
-    name: "Urban Development Expansion",
-    before: "/samples/la_wildfire_current.jpg",  // Temporary placeholder
-    after: "/samples/hurricane_ian_after.png",   // Temporary placeholder
-    description: "City sprawl detection - suburban expansion into rural areas (WorldView-3, 2024)",
-    resolution: "WorldView-3 0.5m resolution", 
-    clipEngagement: "HIGH - Semantic classification of residential vs. agricultural land patterns"
-  },
-  {
-    id: 4,
-    name: "Flood Impact Assessment",
-    before: "/samples/hurricane_ian_before.png", // Temporary placeholder
-    after: "/samples/la_wildfire_current.jpg",   // Temporary placeholder
-    description: "Major flooding event - water level changes and infrastructure impact (Sentinel-1 SAR, 2024)",
-    resolution: "Sentinel-1 SAR 10m resolution",
-    clipEngagement: "VERY HIGH - Semantic detection of water vs. land, flooded infrastructure"
-  },
-  {
-    id: 5,
-    name: "Agricultural Field Rotation",
-    before: "/samples/la_wildfire_current.jpg",  // Temporary placeholder
-    after: "/samples/hurricane_ian_before.png",  // Temporary placeholder
-    description: "Crop rotation patterns - semantic analysis of different agricultural land use (PlanetScope, 2024)",
-    resolution: "PlanetScope 3m resolution",
-    clipEngagement: "MEDIUM - CLIP identifies different crop types and growth stages"
-  },
-  {
-    id: 6,
-    name: "Wildfire Smoke Detection",
-    before: "/samples/la_wildfire_current.jpg",
-    after: "/samples/la_wildfire_current.jpg",
-    description: "Los Angeles wildfire smoke captured by Sentinel-2 (ESA, January 2025)",
-    resolution: "Sentinel-2 10m resolution",
-    clipEngagement: "MEDIUM - Visual smoke pattern analysis vs. clear skies"
-  }
-];
+  // Curated sample image sets for change detection analysis
+  const sampleImages: SampleImage[] = [
+    {
+      id: 1,
+      name: "Hurricane Ian - Power Grid Impact",
+      before: "/samples/hurricane_ian_before.png",
+      after: "/samples/hurricane_ian_after.png",
+      description: "Dramatic nighttime satellite imagery showing power grid disruption across Florida during Hurricane Ian (September 2022)",
+      resolution: "NASA Black Marble 500m",
+      clipEngagement: "Power infrastructure analysis"
+    },
+    {
+      id: 2,
+      name: "Los Angeles Wildfire Smoke",
+      before: "/samples/la_wildfire_current.jpg",
+      after: "/samples/la_wildfire_current.jpg",
+      description: "Wildfire smoke plumes and atmospheric changes captured by satellite over Los Angeles region (January 2025)",
+      resolution: "Sentinel-2 10m",
+      clipEngagement: "Atmospheric conditions analysis"
+    },
+    {
+      id: 3,
+      name: "Comparison Test - Same Images",
+      before: "/samples/hurricane_ian_before.png",
+      after: "/samples/hurricane_ian_before.png",
+      description: "Control test using identical images to demonstrate detection accuracy and false positive handling",
+      resolution: "NASA Black Marble 500m",
+      clipEngagement: "Baseline comparison test"
+    }
+  ];
 
 export default function Home() {
   const [beforeImage, setBeforeImage] = useState<File | null>(null);
@@ -140,55 +113,10 @@ export default function Home() {
     error?: string;
   } | null>(null);
   const [selectedSample, setSelectedSample] = useState<number | null>(null);
-  const [processingMode, setProcessingMode] = useState<string>("hybrid");
-  const [clipStatus, setClipStatus] = useState<any>(null);
+  const [processingMode, setProcessingMode] = useState<string>("smart_analysis");
 
   // API URL for both local and production
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
-
-  // Check CLIP status on component load
-  useEffect(() => {
-    const checkClipStatus = async () => {
-      try {
-        const response = await fetch(`${API_URL}/api/clip-status`);
-        const data = await response.json();
-        setClipStatus(data);
-      } catch (error) {
-        console.error('Failed to check CLIP status:', error);
-        setClipStatus({ error: 'Failed to check CLIP status' });
-      }
-    };
-    
-    checkClipStatus();
-  }, [API_URL]);
-
-  // Processing mode configuration
-  const processingModes = [
-    {
-      id: "hybrid",
-      name: "🧠 Hybrid AI (Default)",
-      description: "OpenCV pixel detection + CLIP semantic analysis",
-      performance: "~300ms",
-      accuracy: "Highest - Combines pixel precision with semantic understanding",
-      useCase: "Best for most scenarios - filters pixel noise with AI validation"
-    },
-    {
-      id: "clip_only", 
-      name: "🎯 CLIP Semantic Only",
-      description: "Pure AI semantic analysis without pixel filtering",
-      performance: "~200ms",
-      accuracy: "High semantic - May miss subtle pixel changes",
-      useCase: "Best for detecting conceptual changes (land use, objects, etc.)"
-    },
-    {
-      id: "opencv_only",
-      name: "📊 OpenCV Pixel Only",
-      description: "Traditional pixel-based change detection",
-      performance: "~100ms",
-      accuracy: "High pixel precision - May produce false positives",
-      useCase: "Best for detecting precise pixel changes, fastest processing"
-    }
-  ];
 
   // Convert File to base64 string
   const fileToBase64 = (file: File): Promise<string> => {
@@ -225,7 +153,7 @@ export default function Home() {
         body: JSON.stringify({
           before_image_base64: beforeBase64,
           after_image_base64: afterBase64,
-          processing_mode: processingMode,
+          processing_mode: "opencv_only",
         }),
       });
 
@@ -284,14 +212,14 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Enhanced MCP Status Banner */}
+        {/* Simplified Status Banner */}
         <div className="matrix-card matrix-glow p-4 mb-8 rounded-lg matrix-scanline">
           <div className="flex items-center justify-center space-x-2 flex-wrap">
             <div className="matrix-pulse">
               <div className="w-3 h-3 bg-green-400 rounded-full"></div>
             </div>
             <span className="matrix-text font-mono text-lg">
-              [MATRIX AI: ONLINE] • MCP TOOLS: ACTIVE • HYBRID DETECTION: ENABLED
+              [MATRIX CHANGE DETECTOR: ONLINE] • SATELLITE IMAGE ANALYSIS ACTIVE
             </span>
             <div className="matrix-pulse">
               <div className="w-3 h-3 bg-green-400 rounded-full"></div>
@@ -299,141 +227,8 @@ export default function Home() {
           </div>
           <div className="flex items-center justify-center space-x-2 mt-2 flex-wrap">
             <span className="matrix-text font-mono text-sm opacity-80">
-              🧠 OpenCV + CLIP Semantic Analysis • 🎯 Change Classification • ⚡ Threat Assessment
+              🔍 OpenCV Detection • 🤖 GPT-4 Vision Analysis • 📊 Change Analytics
             </span>
-          </div>
-          {/* CLIP Debug Panel */}
-          <div className="mt-4 flex justify-center space-x-2 flex-wrap gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={async () => {
-                try {
-                  const response = await fetch(`${API_URL}/api/clip-status`);
-                  const data = await response.json();
-                  alert(`CLIP Status:\n${JSON.stringify(data, null, 2)}`);
-                } catch (error) {
-                  alert(`Error checking CLIP status: ${error}`);
-                }
-              }}
-              className="text-xs"
-            >
-              🔍 CLIP STATUS
-            </Button>
-            <Button
-              variant="outline" 
-              size="sm"
-              onClick={async () => {
-                try {
-                  const response = await fetch(`${API_URL}/api/force-clip-init`, { method: 'POST' });
-                  const data = await response.json();
-                  alert(`Force CLIP Init:\n${JSON.stringify(data, null, 2)}`);
-                } catch (error) {
-                  alert(`Error forcing CLIP init: ${error}`);
-                }
-              }}
-              className="text-xs"
-            >
-              🚀 FORCE INIT
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={async () => {
-                try {
-                  const response = await fetch(`${API_URL}/api/debug-imports`, { method: 'POST' });
-                  
-                  if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-                  }
-                  
-                  const data = await response.json();
-                  
-                  // Check if we got valid data
-                  if (!data || typeof data !== 'object') {
-                    throw new Error('Invalid response data from server');
-                  }
-                  
-                  // Check if the API call was successful
-                  if (data.success === false) {
-                    alert(`❌ Debug API Error: ${data.error || 'Unknown error'}`);
-                    return;
-                  }
-                  
-                  // Create a more readable debug report
-                  let report = "🔍 CLIP IMPORT DEBUG REPORT\n";
-                  report += "=" + "=".repeat(50) + "\n\n";
-                  
-                  // Check imports section
-                  if (data.imports && typeof data.imports === 'object') {
-                    report += "📦 PACKAGE IMPORTS:\n";
-                    Object.entries(data.imports).forEach(([name, info]: [string, any]) => {
-                      try {
-                        const status = info?.available ? "✅" : "❌";
-                        const details = info?.available ? (info.version || 'unknown version') : (info?.error || 'unknown error');
-                        report += `${status} ${name}: ${details}\n`;
-                      } catch (e) {
-                        report += `❌ ${name}: Error processing info\n`;
-                      }
-                    });
-                  } else {
-                    report += "📦 PACKAGE IMPORTS: Error - no import data available\n";
-                  }
-                  
-                  // Check CLIP status
-                  report += "\n🧠 CLIP STATUS:\n";
-                  if (data.clip_status && typeof data.clip_status === 'object') {
-                    if (data.clip_status.import_success) {
-                      report += `✅ CLIP imported successfully\n`;
-                      if (data.clip_status.models && Array.isArray(data.clip_status.models)) {
-                        report += `📋 Available models: ${data.clip_status.models.join(', ')}\n`;
-                      }
-                    } else {
-                      report += `❌ CLIP import failed: ${data.clip_status.error || 'unknown error'}\n`;
-                    }
-                  } else {
-                    report += `❌ CLIP status data unavailable\n`;
-                  }
-                  
-                  // System info
-                  report += "\n🖥️ SYSTEM INFO:\n";
-                  if (data.python_version) {
-                    report += `🐍 Python: ${data.python_version.split(' ')[0]}\n`;
-                  }
-                  if (data.system_info?.env_vars?.PYTHONPATH) {
-                    report += `📁 PYTHONPATH: ${data.system_info.env_vars.PYTHONPATH}\n`;
-                  }
-                  if (data.timestamp) {
-                    report += `⏰ Timestamp: ${data.timestamp}\n`;
-                  }
-                  
-                  alert(report);
-                  
-                } catch (error) {
-                  console.error('Debug imports error:', error);
-                  alert(`❌ Error debugging imports: ${error}\n\nCheck browser console for details.`);
-                }
-              }}
-              className="text-xs"
-            >
-              🐛 DEBUG IMPORTS
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={async () => {
-                try {
-                  const response = await fetch(`${API_URL}/api/test`);
-                  const data = await response.json();
-                  alert(`✅ API Test Successful!\n\nMessage: ${data.message}\nTimestamp: ${data.timestamp}\n\nAvailable endpoints:\n${data.endpoints_available?.join('\n') || 'Unknown'}`);
-                } catch (error) {
-                  alert(`❌ API Test Failed: ${error}\n\nCheck if backend is running at: ${API_URL}`);
-                }
-              }}
-              className="text-xs"
-            >
-              🔧 TEST API
-            </Button>
           </div>
         </div>
 
@@ -451,26 +246,15 @@ export default function Home() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              {/* Sample Data Section */}
+                            {/* Sample Data Section */}
               <div>
                 <Label className="matrix-text text-lg font-mono block mb-4">
-                  &gt; CLASSIFIED SAMPLE DATA - CLIP AI TESTING:
+                  &gt; SATELLITE IMAGERY SAMPLES:
                 </Label>
                 <div className="matrix-border p-3 rounded-lg bg-blue-900/10 mb-4">
                   <p className="matrix-text font-mono text-sm opacity-80">
-                    🧠 <span className="text-blue-400">AI ENGAGEMENT LEVELS:</span> Each sample is optimized to test different CLIP semantic analysis capabilities
+                    🛰️ <span className="text-blue-400">CURATED DATASETS:</span> Real satellite imagery from major events with detailed change analysis
                   </p>
-                  <div className="flex flex-wrap gap-2 mt-2">
-                    <span className="px-2 py-1 bg-red-900/50 text-red-300 border border-red-500 rounded text-xs font-mono">
-                      VERY HIGH: Complex semantic understanding required
-                    </span>
-                    <span className="px-2 py-1 bg-orange-900/50 text-orange-300 border border-orange-500 rounded text-xs font-mono">
-                      HIGH: Advanced pattern recognition
-                    </span>
-                    <span className="px-2 py-1 bg-yellow-900/50 text-yellow-300 border border-yellow-500 rounded text-xs font-mono">
-                      MEDIUM: Standard semantic analysis
-                    </span>
-                  </div>
                 </div>
                 <div className="grid gap-4">
                   {sampleImages.map((sample) => (
@@ -483,17 +267,12 @@ export default function Home() {
                       }`}
                       onClick={() => loadSampleImages(sample)}
                     >
-                      {/* CLIP Engagement Badge */}
                       <div className="flex justify-between items-start mb-2">
                         <h3 className="matrix-text font-mono font-bold text-lg">
                           {sample.name}
                         </h3>
-                        <div className={`px-2 py-1 rounded text-xs font-mono font-bold ${
-                          sample.clipEngagement?.startsWith('VERY HIGH') ? 'bg-red-900/50 text-red-300 border border-red-500' :
-                          sample.clipEngagement?.startsWith('HIGH') ? 'bg-orange-900/50 text-orange-300 border border-orange-500' :
-                          'bg-yellow-900/50 text-yellow-300 border border-yellow-500'
-                        }`}>
-                          🧠 {sample.clipEngagement?.split(' - ')[0] || 'UNKNOWN'}
+                        <div className="px-2 py-1 rounded text-xs font-mono font-bold bg-blue-900/50 text-blue-300 border border-blue-500">
+                          🛰️ {sample.clipEngagement}
                         </div>
                       </div>
                       
@@ -501,108 +280,9 @@ export default function Home() {
                         {sample.description}
                       </p>
                       
-                      {/* CLIP Analysis Description */}
-                      <div className="matrix-border rounded p-2 mb-2 bg-green-900/10">
-                        <p className="matrix-text opacity-60 text-xs font-mono">
-                          🔍 CLIP ANALYSIS: {sample.clipEngagement?.split(' - ')[1] || 'Standard semantic analysis'}
-                        </p>
-                      </div>
-                      
                       <p className="matrix-text opacity-50 text-xs font-mono">
-                        RES: {sample.resolution}
+                        RESOLUTION: {sample.resolution}
                       </p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Processing Mode Selection */}
-              <div className="mb-6">
-                <Label className="matrix-text text-lg font-mono block mb-4">
-                  &gt; PROCESSING MODE CONFIGURATION:
-                </Label>
-                                 <div className="matrix-border p-3 rounded-lg bg-green-900/10 mb-4">
-                   <p className="matrix-text font-mono text-sm opacity-80">
-                     🎯 <span className="text-green-400">DEFAULT MODE:</span> Hybrid AI combines OpenCV precision with CLIP semantic understanding for optimal results
-                   </p>
-                   <div className="flex items-center justify-between mt-2">
-                     <Button
-                       variant="outline"
-                       size="sm"
-                       onClick={() => setProcessingMode("hybrid")}
-                       className="text-xs"
-                     >
-                       🔄 RESET TO DEFAULT (HYBRID)
-                     </Button>
-                     {clipStatus && (
-                       <div className={`px-2 py-1 rounded text-xs font-mono ${
-                         clipStatus.clip_available_flag ? 
-                           'bg-green-900/50 text-green-300 border border-green-500' :
-                           'bg-red-900/50 text-red-300 border border-red-500'
-                       }`}>
-                         {clipStatus.clip_available_flag ? '✅ CLIP AVAILABLE' : '❌ CLIP UNAVAILABLE'}
-                       </div>
-                     )}
-                   </div>
-                 </div>
-                <div className="space-y-3">
-                  {processingModes.map((mode) => (
-                    <div
-                      key={mode.id}
-                      className={`p-4 rounded-lg border-2 cursor-pointer transition-all duration-300 ${
-                        processingMode === mode.id
-                          ? 'matrix-glow border-green-400 bg-green-900/20'
-                          : 'matrix-border hover:border-green-400 hover:bg-green-900/10'
-                      }`}
-                      onClick={() => setProcessingMode(mode.id)}
-                    >
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <div className="flex items-center space-x-3">
-                            <input
-                              type="radio"
-                              id={mode.id}
-                              name="processing-mode"
-                              value={mode.id}
-                              checked={processingMode === mode.id}
-                              onChange={(e) => setProcessingMode(e.target.value)}
-                              className="w-4 h-4 text-green-400 bg-black border-green-400 focus:ring-green-400"
-                            />
-                                                       <h3 className="matrix-text font-mono font-bold text-lg">
-                             {mode.name}
-                           </h3>
-                           {(mode.id === 'hybrid' || mode.id === 'clip_only') && (
-                             <div className={`ml-2 px-2 py-1 rounded text-xs font-mono ${
-                               clipStatus?.clip_available_flag ? 
-                                 'bg-green-900/50 text-green-300 border border-green-500' :
-                                 'bg-red-900/50 text-red-300 border border-red-500'
-                             }`}>
-                               {clipStatus?.clip_available_flag ? '🧠 CLIP OK' : '⚠️ CLIP NEEDED'}
-                             </div>
-                           )}
-                          </div>
-                          <p className="matrix-text opacity-70 text-sm mt-2 ml-7">
-                            {mode.description}
-                          </p>
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-3 ml-7">
-                            <div className="matrix-border rounded p-2 bg-black/50">
-                              <span className="matrix-text text-xs font-mono">
-                                ⚡ <span className="text-green-400">PERFORMANCE:</span> {mode.performance}
-                              </span>
-                            </div>
-                            <div className="matrix-border rounded p-2 bg-black/50">
-                              <span className="matrix-text text-xs font-mono">
-                                🎯 <span className="text-green-400">ACCURACY:</span> {mode.accuracy}
-                              </span>
-                            </div>
-                          </div>
-                          <div className="matrix-border rounded p-2 mt-2 ml-7 bg-green-900/10">
-                            <span className="matrix-text text-xs font-mono opacity-80">
-                              💡 <span className="text-green-400">USE CASE:</span> {mode.useCase}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
                     </div>
                   ))}
                 </div>
