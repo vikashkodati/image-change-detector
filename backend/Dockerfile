@@ -1,10 +1,34 @@
-# Use Python 3.11 slim image
+# Multi-stage build for optimized production image
+FROM python:3.11-slim as builder
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    cmake \
+    pkg-config \
+    libgl1-mesa-glx \
+    libglib2.0-0 \
+    libsm6 \
+    libxext6 \
+    libxrender-dev \
+    libgomp1 \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Python dependencies
+WORKDIR /app
+COPY pyproject.toml ./
+
+# Install uv for faster package management
+RUN pip install --no-cache-dir uv
+
+# Install dependencies
+RUN uv pip install --system --no-cache -e .
+
+# Production stage
 FROM python:3.11-slim
 
-# Set working directory
-WORKDIR /app
-
-# Install system dependencies for OpenCV and git
+# Install runtime dependencies
 RUN apt-get update && apt-get install -y \
     libgl1-mesa-glx \
     libglib2.0-0 \
@@ -12,56 +36,28 @@ RUN apt-get update && apt-get install -y \
     libxext6 \
     libxrender-dev \
     libgomp1 \
-    curl \
-    git \
+    && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-# Install UV package manager
-RUN pip install uv
+# Copy installed packages from builder
+COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
+COPY --from=builder /usr/local/bin /usr/local/bin
 
-# Copy dependency files first for better Docker layer caching
-COPY backend/pyproject.toml backend/uv.lock ./backend/
-
-# Change to backend directory for UV operations
-WORKDIR /app/backend
-
-# Install Python dependencies including AI packages
-RUN uv sync --frozen
-
-# Force NumPy 1.x installation to fix compatibility issues
-RUN echo "🔧 Forcing NumPy 1.x compatibility..." && \
-    uv pip install "numpy>=1.24.0,<2.0.0" --force-reinstall
-
-# Install CLIP with multiple fallback strategies
-RUN echo "📥 Installing CLIP..." && \
-    uv pip install "git+https://github.com/openai/CLIP.git" || \
-    (echo "⚠️  Git CLIP install failed, trying pip fallback..." && \
-     uv pip install clip-by-openai || \
-     echo "❌ All CLIP installation methods failed - will run with OpenCV-only mode")
-
-# Verify installations with NumPy compatibility check
-RUN echo "🔍 Verifying installations..." && \
-    uv run python -c "import numpy; print(f'✅ numpy: {numpy.__version__}'); assert numpy.__version__.startswith('1.'), f'NumPy 2.x detected: {numpy.__version__}'" && \
-    uv run python -c "import torch; print(f'✅ torch: {torch.__version__}')" && \
-    uv run python -c "import torchvision; print(f'✅ torchvision: {torchvision.__version__}')" && \
-    (uv run python -c "import clip; print(f'✅ CLIP: {clip.available_models()}'); print('✅ CLIP initialization successful')" || \
-     echo "⚠️  CLIP verification failed but torch is available")
+# Set working directory
+WORKDIR /app
 
 # Copy source code
-COPY backend/src/ ./src/
+COPY src/ ./src/
 
-# Copy environment file if it exists (optional)
-COPY backend/.env* ./
+# Set Python path
+ENV PYTHONPATH=/app/src
 
-# Set Python path to include backend source
-ENV PYTHONPATH=/app/backend/src
+# Health check
+HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
+  CMD python -c "import requests; requests.get('http://localhost:8000/api/test', timeout=10)"
 
 # Expose port
 EXPOSE 8000
 
-# Add health check with longer timeout for AI loading
-HEALTHCHECK --interval=30s --timeout=60s --start-period=30s --retries=3 \
-  CMD curl -f http://localhost:8000/api/health || exit 1
-
-# Run the application using UV
-CMD ["uv", "run", "python", "src/change_detector/server.py"] 
+# Run the application
+CMD ["python", "-m", "change_detector.server"] 

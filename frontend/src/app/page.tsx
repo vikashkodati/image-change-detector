@@ -159,6 +159,40 @@ export default function Home() {
 
       const data = await response.json();
       setResults(data);
+
+      // If detection was successful, get GPT-4 Vision analysis
+      if (data.success && data.results && !data.error) {
+        try {
+          console.log('Getting GPT-4 Vision analysis...');
+          const analysisResponse = await fetch(`${API_URL}/api/analyze-changes`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              before_image_base64: beforeBase64,
+              after_image_base64: afterBase64,
+              change_results: data.results
+            }),
+          });
+
+          if (analysisResponse.ok) {
+            const analysisData = await analysisResponse.json();
+            if (analysisData.success) {
+              // Add AI analysis to results
+              setResults(prevResults => ({
+                ...prevResults!,
+                ai_analysis: analysisData.analysis,
+                model_used: analysisData.model_used
+              }));
+              console.log('GPT-4 Vision analysis completed');
+            }
+          }
+        } catch (analysisError) {
+          console.error('GPT-4 Vision analysis failed:', analysisError);
+          // Don't show error to user - just continue without AI analysis
+        }
+      }
     } catch (error) {
       console.error('Error:', error);
       setResults({
@@ -327,6 +361,49 @@ export default function Home() {
                 </div>
               </div>
 
+              {/* Image Preview Section */}
+              {(beforeImage || afterImage) && (
+                <div className="mb-6">
+                  <Label className="matrix-text text-lg font-mono block mb-4">
+                    &gt; IMAGE PREVIEW:
+                  </Label>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="matrix-border rounded-lg p-4 bg-green-900/10">
+                      <h3 className="matrix-text font-mono font-bold mb-2">📸 BEFORE IMAGE</h3>
+                      {beforeImage ? (
+                        <div className="matrix-border rounded overflow-hidden">
+                          <img
+                            src={URL.createObjectURL(beforeImage)}
+                            alt="Before"
+                            className="w-full h-48 object-cover"
+                          />
+                        </div>
+                      ) : (
+                        <div className="matrix-border rounded bg-black/50 h-48 flex items-center justify-center">
+                          <span className="matrix-text opacity-50">No image selected</span>
+                        </div>
+                      )}
+                    </div>
+                    <div className="matrix-border rounded-lg p-4 bg-green-900/10">
+                      <h3 className="matrix-text font-mono font-bold mb-2">📸 AFTER IMAGE</h3>
+                      {afterImage ? (
+                        <div className="matrix-border rounded overflow-hidden">
+                          <img
+                            src={URL.createObjectURL(afterImage)}
+                            alt="After"
+                            className="w-full h-48 object-cover"
+                          />
+                        </div>
+                      ) : (
+                        <div className="matrix-border rounded bg-black/50 h-48 flex items-center justify-center">
+                          <span className="matrix-text opacity-50">No image selected</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Execute Button */}
               <Button
                 onClick={handleDetectChanges}
@@ -335,10 +412,10 @@ export default function Home() {
               >
                 {isProcessing ? (
                   <span className="matrix-pulse">
-                    &gt; ANALYZING... NEURAL NETWORK PROCESSING &lt;
+                    &gt; ANALYZING SATELLITE IMAGERY... &lt;
                   </span>
                 ) : (
-                  "&gt; EXECUTE MCP ANALYSIS &lt;"
+                  "&gt; EXECUTE CHANGE DETECTION &lt;"
                 )}
               </Button>
             </CardContent>
@@ -359,33 +436,32 @@ export default function Home() {
                 <div className="space-y-6">
                   {results.success && results.results ? (
                     <>
-                      {/* Processing Mode Banner */}
-                      <div className={`matrix-border p-3 rounded-lg ${
-                        results.method === 'hybrid_detection' ? 'bg-green-900/20' :
-                        results.method === 'clip_only' ? 'bg-purple-900/20' :
-                        results.method === 'opencv_only' ? 'bg-blue-900/20' : 'bg-gray-900/20'
-                      }`}>
+                      {/* Analysis Method Banner */}
+                      <div className="matrix-border p-3 rounded-lg bg-green-900/20">
                         <div className="matrix-text text-center font-mono">
-                          {results.method === 'hybrid_detection' ? 
-                            '🧠 HYBRID AI ANALYSIS: OpenCV + CLIP Semantic Detection' :
-                          results.method === 'clip_only' ?
-                            '🎯 CLIP SEMANTIC ANALYSIS: Pure AI Semantic Understanding' :
-                          results.method === 'opencv_only' ?
-                            '📊 OPENCV PIXEL ANALYSIS: Traditional Pixel-Based Detection' :
-                            '🔍 ANALYSIS COMPLETE'
-                          }
+                          🔍 SATELLITE CHANGE DETECTION ANALYSIS COMPLETE
                         </div>
-                        {results.processing_mode && (
-                          <div className="matrix-text text-center font-mono text-sm opacity-70 mt-1">
-                            MODE: {results.processing_mode.toUpperCase()} | 
-                            PERFORMANCE: {
-                              results.processing_mode === 'hybrid' ? '~300ms' :
-                              results.processing_mode === 'clip_only' ? '~200ms' :
-                              results.processing_mode === 'opencv_only' ? '~100ms' : 'Variable'
-                            }
-                          </div>
-                        )}
+                        <div className="matrix-text text-center font-mono text-sm opacity-70 mt-1">
+                          OPENCV PIXEL DETECTION • GPT-4 VISION ANALYSIS • HIGH PRECISION METRICS
+                        </div>
                       </div>
+
+                      {/* GPT-4 Vision Analysis */}
+                      {(results as any).ai_analysis && (
+                        <div className="matrix-border p-4 rounded-lg bg-blue-900/20">
+                          <h3 className="matrix-text text-xl font-mono mb-4">
+                            [🤖 AI EXPERT ANALYSIS]
+                          </h3>
+                          <div className="matrix-border p-4 rounded bg-black/50">
+                            <p className="matrix-text text-sm leading-relaxed whitespace-pre-wrap">
+                              {(results as any).ai_analysis}
+                            </p>
+                          </div>
+                          <div className="mt-2 text-xs matrix-text opacity-60">
+                            Powered by {(results as any).model_used || 'GPT-4 Vision'}
+                          </div>
+                        </div>
+                      )}
 
                       {/* Enhanced Hybrid Results */}
                       {results.results.hybrid_available && results.results.final_assessment ? (
@@ -554,45 +630,70 @@ export default function Home() {
                           )}
                         </>
                       ) : (
-                        /* Legacy Results Display (backward compatibility) */
+                        /* Simplified Results Display */
                         <>
+                          {/* Key Metrics Overview */}
                           <div className="matrix-border p-4 rounded-lg bg-green-900/10">
                             <h3 className="matrix-text text-xl font-mono mb-4">
-                              [CHANGE DETECTION MATRIX]
+                              [📊 CHANGE DETECTION METRICS]
                             </h3>
-                            <div className="grid grid-cols-2 gap-4 text-center">
-                              <div className="matrix-border p-3 rounded bg-black/50">
-                                <div className="matrix-text text-3xl font-bold matrix-pulse">
+                            
+                            {/* Change Percentage - Most Important Metric */}
+                            <div className="matrix-border p-4 rounded-lg bg-black/50 mb-4">
+                              <div className="text-center">
+                                <div className="matrix-text text-5xl font-bold matrix-pulse mb-2">
                                   {(results.results.change_percentage || 0).toFixed(2)}%
                                 </div>
-                                <div className="matrix-text text-sm opacity-70">CHANGE RATE</div>
-                              </div>
-                              <div className="matrix-border p-3 rounded bg-black/50">
-                                <div className="matrix-text text-3xl font-bold matrix-pulse">
-                                  {results.results.contours_count || 0}
+                                <div className="matrix-text text-lg opacity-80">OF IMAGE AREA CHANGED</div>
+                                <div className="matrix-text text-sm opacity-60 mt-1">
+                                  {results.results.change_percentage && results.results.change_percentage > 5 
+                                    ? "🔴 SIGNIFICANT CHANGE DETECTED" 
+                                    : results.results.change_percentage && results.results.change_percentage > 1 
+                                    ? "🟡 MODERATE CHANGE DETECTED" 
+                                    : "🟢 MINIMAL CHANGE DETECTED"
+                                  }
                                 </div>
-                                <div className="matrix-text text-sm opacity-70">ANOMALIES</div>
                               </div>
                             </div>
-                            
-                            <div className="mt-4 matrix-border p-3 rounded bg-black/50">
-                              <div className="matrix-text text-lg font-mono">
-                                PIXELS ALTERED: {(results.results.changed_pixels || 0).toLocaleString()} / {(results.results.total_pixels || 0).toLocaleString()}
+
+                            {/* Detailed Analytics Grid */}
+                            <div className="grid grid-cols-3 gap-4">
+                              <div className="matrix-border p-3 rounded bg-black/50 text-center">
+                                <div className="matrix-text text-2xl font-bold">
+                                  {(results.results.changed_pixels || 0).toLocaleString()}
+                                </div>
+                                <div className="matrix-text text-xs opacity-70">PIXELS CHANGED</div>
+                              </div>
+                              <div className="matrix-border p-3 rounded bg-black/50 text-center">
+                                <div className="matrix-text text-2xl font-bold">
+                                  {results.results.contours_count || 0}
+                                </div>
+                                <div className="matrix-text text-xs opacity-70">CHANGE REGIONS</div>
+                              </div>
+                              <div className="matrix-border p-3 rounded bg-black/50 text-center">
+                                <div className="matrix-text text-2xl font-bold">
+                                  {((results.results.total_pixels || 0) / 1000000).toFixed(1)}M
+                                </div>
+                                <div className="matrix-text text-xs opacity-70">TOTAL PIXELS</div>
                               </div>
                             </div>
                           </div>
 
+                          {/* Change Visualization */}
                           {results.results.change_mask_base64 && (
-                            <div className="matrix-border p-4 rounded-lg bg-green-900/10">
+                            <div className="matrix-border p-4 rounded-lg bg-purple-900/10">
                               <h3 className="matrix-text text-xl font-mono mb-4">
-                                [CHANGE MASK OVERLAY]
+                                [🎯 CHANGE VISUALIZATION]
                               </h3>
                               <div className="matrix-border rounded-lg overflow-hidden matrix-glow">
                                 <img
                                   src={`data:image/png;base64,${results.results.change_mask_base64}`}
-                                  alt="Change Detection Mask"
+                                  alt="Change Detection Visualization"
                                   className="w-full h-auto"
                                 />
+                              </div>
+                              <div className="mt-2 matrix-text text-sm opacity-70">
+                                🟢 Green areas highlight detected changes between the before and after images
                               </div>
                             </div>
                           )}
