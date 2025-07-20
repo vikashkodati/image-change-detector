@@ -5,7 +5,6 @@ description = "FastMCP server for satellite image change detection"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
-    "fastmcp>=0.1.0",
     "opencv-python>=4.8.0",
     "pillow>=10.0.0",
     "numpy>=1.24.0,<2.0.0",  # Fix: Constrain to NumPy 1.x for torch compatibility

@@ -5,16 +5,12 @@ import asyncio
 import base64
 from io import BytesIO
 from typing import Dict, Any, Optional
-from pathlib import Path
 
 import cv2
 import numpy as np
 from PIL import Image
-from fastmcp import FastMCP
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
-from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from openai import OpenAI
 from dotenv import load_dotenv
@@ -30,11 +26,12 @@ if os.getenv('OPENAI_API_KEY'):
 else:
     print("⚠️ OpenAI API key not found - GPT-4 Vision analysis will be unavailable")
 
-# Initialize FastMCP server
-mcp = FastMCP("Image Change Detector")
-
-# Get the FastAPI app from FastMCP
-app = mcp.get_fastapi_app()
+# Create FastAPI app
+app = FastAPI(
+    title="Satellite Image Change Detector",
+    description="OpenCV + GPT-4 Vision change detection service",
+    version="1.0.0"
+)
 
 # Configure CORS middleware
 app.add_middleware(
@@ -215,6 +212,33 @@ Keep your analysis concise but informative, as if briefing a decision-maker."""
         return None
 
 # FastAPI endpoints
+@app.get("/")
+async def root():
+    """Root endpoint"""
+    return {"message": "Satellite Image Change Detector API", "status": "operational"}
+
+@app.get("/api/health")
+async def health_endpoint():
+    """Health check endpoint for Railway"""
+    try:
+        # Test basic functionality
+        test_array = np.array([[1, 2], [3, 4]])
+        cv2_available = hasattr(cv2, 'cvtColor')
+        
+        return {
+            "status": "healthy",
+            "service": "Satellite Image Change Detector",
+            "version": "1.0.0",
+            "opencv_available": cv2_available,
+            "numpy_available": True,
+            "openai_available": openai_client is not None
+        }
+    except Exception as e:
+        return {
+            "status": "unhealthy",
+            "error": str(e)
+        }
+
 @app.get("/api/test")
 async def test_endpoint():
     """Test endpoint to verify API is working"""
@@ -222,6 +246,7 @@ async def test_endpoint():
         "message": "Satellite Change Detection API is operational",
         "timestamp": str(asyncio.get_event_loop().time()),
         "endpoints_available": [
+            "/",
             "/api/test",
             "/api/health",
             "/api/detect-changes", 
@@ -231,15 +256,6 @@ async def test_endpoint():
             "opencv_detection": True,
             "gpt4_vision_analysis": openai_client is not None
         }
-    }
-
-@app.get("/api/health")
-async def health_endpoint():
-    """Health check endpoint for Railway"""
-    return {
-        "status": "healthy",
-        "service": "Satellite Image Change Detector",
-        "version": "1.0.0"
     }
 
 @app.post("/api/detect-changes")
@@ -301,106 +317,24 @@ async def analyze_changes_endpoint(request: AnalysisRequest):
             "error": str(e)
         }
 
-# MCP Tools
-@mcp.tool()
-async def detect_image_changes(before_image_base64: str, after_image_base64: str) -> Dict[str, Any]:
-    """
-    Detect changes between two images using OpenCV computer vision.
-    
-    Args:
-        before_image_base64: Base64 encoded image data for the "before" image
-        after_image_base64: Base64 encoded image data for the "after" image
-    
-    Returns:
-        Dictionary containing change detection results and statistics
-    """
-    try:
-        # Decode images
-        before_image = decode_base64_image(before_image_base64)
-        after_image = decode_base64_image(after_image_base64)
-        
-        # Detect changes
-        results = detector.detect_changes(before_image, after_image)
-        
-        return {
-            "success": True,
-            "results": results,
-            "method": "opencv_detection"
-        }
-        
-    except Exception as e:
-        return {
-            "success": False,
-            "error": str(e),
-            "method": "opencv_detection"
-        }
-
-@mcp.tool()
-async def analyze_image_changes_with_ai(before_image_base64: str, after_image_base64: str, change_results: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-    """
-    Analyze image changes using GPT-4 Vision for detailed explanations.
-    
-    Args:
-        before_image_base64: Base64 encoded image data for the "before" image  
-        after_image_base64: Base64 encoded image data for the "after" image
-        change_results: Optional results from change detection for context
-    
-    Returns:
-        Dictionary containing AI analysis of the changes
-    """
-    try:
-        if not openai_client:
-            return {
-                "success": False,
-                "error": "OpenAI API key not configured - GPT-4 Vision analysis unavailable"
-            }
-        
-        # Use provided change results or empty dict
-        if change_results is None:
-            change_results = {}
-        
-        analysis = await analyze_changes_with_gpt4_vision(
-            before_image_base64,
-            after_image_base64, 
-            change_results
-        )
-        
-        if analysis:
-            return {
-                "success": True,
-                "analysis": analysis,
-                "model_used": "gpt-4-vision-preview"
-            }
-        else:
-            return {
-                "success": False,
-                "error": "GPT-4 Vision analysis failed"
-            }
-            
-    except Exception as e:
-        return {
-            "success": False,
-            "error": str(e)
-        }
-
-@mcp.tool()
-async def health_check() -> Dict[str, Any]:
-    """Health check endpoint for the change detection service"""
-    return {
-        "status": "healthy",
-        "service": "Satellite Image Change Detector",
-        "version": "1.0.0",
-        "capabilities": {
-            "opencv_detection": True,
-            "gpt4_vision_analysis": openai_client is not None
-        }
-    }
-
 if __name__ == "__main__":
     print("🚀 Starting Satellite Change Detection Server...")
     print(f"🔧 Python path: {os.environ.get('PYTHONPATH', 'Not set')}")
     print(f"🔑 OpenAI API key: {'Set' if os.getenv('OPENAI_API_KEY') else 'Not set'}")
-    print("📱 Using FastMCP server with simplified OpenCV + GPT-4 Vision analysis")
+    print("📱 Using Pure FastAPI server with OpenCV + GPT-4 Vision analysis")
+    
+    # Test basic imports
+    try:
+        import cv2
+        print(f"✅ OpenCV version: {cv2.__version__}")
+    except Exception as e:
+        print(f"❌ OpenCV import failed: {e}")
+    
+    try:
+        import numpy as np
+        print(f"✅ NumPy version: {np.__version__}")
+    except Exception as e:
+        print(f"❌ NumPy import failed: {e}")
     
     # Run the server
     import uvicorn
@@ -410,4 +344,11 @@ if __name__ == "__main__":
     host = "0.0.0.0"  # Bind to all interfaces for production
     
     print(f"🌐 Starting server on {host}:{port}")
-    uvicorn.run(app, host=host, port=port)
+    print("📡 Health check endpoint: /api/health")
+    print("🧪 Test endpoint: /api/test")
+    
+    try:
+        uvicorn.run(app, host=host, port=port, log_level="info")
+    except Exception as e:
+        print(f"❌ Server startup failed: {e}")
+        raise
