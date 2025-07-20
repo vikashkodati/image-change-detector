@@ -17,7 +17,7 @@ RUN apt-get update && apt-get install -y \
 
 # Install Python dependencies
 WORKDIR /app
-COPY pyproject.toml ./
+COPY backend/pyproject.toml ./
 
 # Install uv for faster package management
 RUN pip install --no-cache-dir uv
@@ -47,7 +47,7 @@ COPY --from=builder /usr/local/bin /usr/local/bin
 WORKDIR /app
 
 # Copy source code
-COPY src/ ./src/
+COPY backend/src/ ./src/
 
 # Set Python path
 ENV PYTHONPATH=/app/src
