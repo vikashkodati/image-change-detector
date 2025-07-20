@@ -52,9 +52,9 @@ COPY backend/src/ ./src/
 # Set Python path
 ENV PYTHONPATH=/app/src
 
-# Health check
+# Health check  
 HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
-  CMD python -c "import requests; requests.get('http://localhost:8000/api/test', timeout=10)"
+  CMD python -c "import requests; requests.get('http://localhost:8000/api/health', timeout=10)"
 
 # Expose port
 EXPOSE 8000

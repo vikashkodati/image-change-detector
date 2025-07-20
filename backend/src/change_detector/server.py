@@ -223,6 +223,7 @@ async def test_endpoint():
         "timestamp": str(asyncio.get_event_loop().time()),
         "endpoints_available": [
             "/api/test",
+            "/api/health",
             "/api/detect-changes", 
             "/api/analyze-changes"
         ],
@@ -230,6 +231,15 @@ async def test_endpoint():
             "opencv_detection": True,
             "gpt4_vision_analysis": openai_client is not None
         }
+    }
+
+@app.get("/api/health")
+async def health_endpoint():
+    """Health check endpoint for Railway"""
+    return {
+        "status": "healthy",
+        "service": "Satellite Image Change Detector",
+        "version": "1.0.0"
     }
 
 @app.post("/api/detect-changes")
