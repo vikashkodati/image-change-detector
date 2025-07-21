@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import MatrixRain from "@/components/MatrixRain";
 
 // TypeScript interface for sample image data
@@ -16,6 +17,47 @@ interface SampleImage {
   description: string;
   resolution: string;
   clipEngagement: string;
+}
+
+// Type definitions for agent results
+interface AgentToolResult {
+  tool_call_id: string;
+  tool_name: string;
+  result: {
+    success: boolean;
+    results?: any;
+    analysis?: string;
+    assessment?: any;
+    error?: string;
+    tool_used: string;
+  };
+}
+
+interface AgentResults {
+  success: boolean;
+  agent_analysis?: string;
+  tool_results?: AgentToolResult[];
+  tools_used?: string[];
+  orchestration_method?: string;
+  error?: string;
+}
+
+// Legacy results structure for backward compatibility
+interface LegacyResults {
+  success: boolean;
+  method?: string;
+  processing_mode?: string;
+  results?: {
+    change_percentage?: number;
+    changed_pixels?: number;
+    total_pixels?: number;
+    change_mask_base64?: string;
+    contours_count?: number;
+    analysis_method?: string;
+  };
+  ai_analysis?: string;
+  model_used?: string;
+  error?: string;
 }
 
   // Curated sample image sets for change detection analysis
@@ -53,67 +95,10 @@ export default function Home() {
   const [beforeImage, setBeforeImage] = useState<File | null>(null);
   const [afterImage, setAfterImage] = useState<File | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [results, setResults] = useState<{
-    success: boolean;
-    method?: string;
-    processing_mode?: string;
-    results?: {
-      // OpenCV results (legacy compatibility)
-      change_percentage?: number;
-      changed_pixels?: number;
-      total_pixels?: number;
-      change_mask_base64?: string;
-      contours_count?: number;
-      
-      // Hybrid results structure
-      hybrid_available?: boolean;
-      opencv_results?: {
-        change_percentage: number;
-        changed_pixels: number;
-        total_pixels: number;
-        change_mask_base64: string;
-        contours_count: number;
-      };
-      semantic_results?: {
-        available: boolean;
-        semantic_similarity?: number;
-        is_meaningful_change?: boolean;
-        change_confidence?: number;
-        interpretation?: string;
-        error?: string;
-      };
-      classification_results?: {
-        available: boolean;
-        top_categories?: Array<{
-          category: string;
-          confidence: number;
-          likelihood: string;
-        }>;
-        most_likely?: string;
-        max_confidence?: number;
-        error?: string;
-      };
-      final_assessment?: {
-        has_meaningful_change: boolean;
-        confidence: number;
-        reasoning: string;
-        change_type: string;
-        threat_level: string;
-      };
-      processing_time?: {
-        opencv_stage: string;
-        clip_stage: string;
-      };
-    };
-    enhanced_features?: {
-      semantic_analysis: boolean;
-      change_classification: boolean;
-      threat_assessment: string;
-    };
-    error?: string;
-  } | null>(null);
+  const [results, setResults] = useState<AgentResults | LegacyResults | null>(null);
   const [selectedSample, setSelectedSample] = useState<number | null>(null);
-  const [processingMode, setProcessingMode] = useState<string>("smart_analysis");
+  const [analysisMode, setAnalysisMode] = useState<string>("agent_orchestrated");
+  const [userQuery, setUserQuery] = useState<string>("Analyze these satellite images for changes and provide detailed insights about what has changed, including significance and implications.");
 
   // API URL for both local and production
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
@@ -132,7 +117,53 @@ export default function Home() {
     });
   };
 
-  const handleDetectChanges = async () => {
+  // Agent-orchestrated analysis (new primary method)
+  const handleAgentAnalysis = async () => {
+    if (!beforeImage || !afterImage) {
+      alert("Please select both before and after images.");
+      return;
+    }
+
+    setIsProcessing(true);
+    setResults(null);
+
+    try {
+      const beforeBase64 = await fileToBase64(beforeImage);
+      const afterBase64 = await fileToBase64(afterImage);
+
+      const response = await fetch(`${API_URL}/api/agent-analyze`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          before_image_base64: beforeBase64,
+          after_image_base64: afterBase64,
+          user_query: userQuery
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data: AgentResults = await response.json();
+      setResults(data);
+
+    } catch (error) {
+      console.error('Agent analysis error:', error);
+      setResults({
+        success: false,
+        error: 'Failed to process images with AI agent. Please check your connection and try again.',
+        orchestration_method: "agent_error"
+      });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  // Legacy direct detection (backup method)
+  const handleDirectDetection = async () => {
     if (!beforeImage || !afterImage) {
       alert("Please select both before and after images.");
       return;
@@ -204,6 +235,15 @@ export default function Home() {
     }
   };
 
+  // Main handler that delegates based on analysis mode
+  const handleAnalysis = () => {
+    if (analysisMode === "agent_orchestrated") {
+      handleAgentAnalysis();
+    } else {
+      handleDirectDetection();
+    }
+  };
+
   const loadSampleImages = async (sample: SampleImage) => {
     setSelectedSample(sample.id);
     
@@ -224,6 +264,58 @@ export default function Home() {
     }
   };
 
+  // Extract change detection data from agent results for display
+  const getChangeDetectionData = (results: AgentResults | LegacyResults) => {
+    if (!results.success) return null;
+
+    // Check if it's agent results
+    if ('tool_results' in results && results.tool_results) {
+      const detectionTool = results.tool_results.find(tool => tool.tool_name === 'detect_image_changes');
+      if (detectionTool?.result?.success && detectionTool.result.results) {
+        return detectionTool.result.results;
+      }
+    }
+
+    // Check if it's legacy results
+    if ('results' in results && results.results) {
+      return results.results;
+    }
+
+    return null;
+  };
+
+  // Extract significance assessment from agent results
+  const getSignificanceAssessment = (results: AgentResults) => {
+    if (!results.success || !results.tool_results) return null;
+
+    const assessmentTool = results.tool_results.find(tool => tool.tool_name === 'assess_change_significance');
+    if (assessmentTool?.result?.success && assessmentTool.result.assessment) {
+      return assessmentTool.result.assessment;
+    }
+
+    return null;
+  };
+
+  // Extract GPT-4 Vision analysis (either from agent or legacy)
+  const getVisionAnalysis = (results: AgentResults | LegacyResults) => {
+    if (!results.success) return null;
+
+    // Check if it's agent results
+    if ('tool_results' in results && results.tool_results) {
+      const visionTool = results.tool_results.find(tool => tool.tool_name === 'analyze_images_with_gpt4_vision');
+      if (visionTool?.result?.success && visionTool.result.analysis) {
+        return visionTool.result.analysis;
+      }
+    }
+
+    // Check if it's legacy results
+    if ('ai_analysis' in results && results.ai_analysis) {
+      return results.ai_analysis;
+    }
+
+    return null;
+  };
+
   return (
     <div className="min-h-screen relative overflow-hidden">
       {/* Matrix Rain Background */}
@@ -241,19 +333,19 @@ export default function Home() {
           </h1>
           <div className="matrix-scanline">
             <p className="text-xl matrix-text opacity-80">
-              🕶️ MCP-POWERED SATELLITE IMAGE ANALYSIS SYSTEM 🕶️
+              🤖 AI AGENT-POWERED SATELLITE ANALYSIS SYSTEM 🤖
             </p>
           </div>
         </div>
 
-        {/* Simplified Status Banner */}
+        {/* Enhanced Status Banner */}
         <div className="matrix-card matrix-glow p-4 mb-8 rounded-lg matrix-scanline">
           <div className="flex items-center justify-center space-x-2 flex-wrap">
             <div className="matrix-pulse">
               <div className="w-3 h-3 bg-green-400 rounded-full"></div>
             </div>
             <span className="matrix-text font-mono text-lg">
-              [MATRIX CHANGE DETECTOR: ONLINE] • SATELLITE IMAGE ANALYSIS ACTIVE
+              [MATRIX AGENT SYSTEM: ONLINE] • AI-ORCHESTRATED SATELLITE ANALYSIS ACTIVE
             </span>
             <div className="matrix-pulse">
               <div className="w-3 h-3 bg-green-400 rounded-full"></div>
@@ -261,7 +353,7 @@ export default function Home() {
           </div>
           <div className="flex items-center justify-center space-x-2 mt-2 flex-wrap">
             <span className="matrix-text font-mono text-sm opacity-80">
-              🔍 OpenCV Detection • 🤖 GPT-4 Vision Analysis • 📊 Change Analytics
+              🤖 OpenAI Agent • 🔍 MCP Tools • 🛰️ Computer Vision • 👁️ GPT-4 Vision • 📊 Significance Assessment
             </span>
           </div>
         </div>
@@ -273,14 +365,86 @@ export default function Home() {
           <Card className="matrix-card matrix-glow">
             <CardHeader className="matrix-scanline">
               <CardTitle className="matrix-text text-2xl font-mono">
-                {'>>'} UPLOAD SURVEILLANCE DATA
+                {'>>'} AI AGENT CONTROL PANEL
               </CardTitle>
               <CardDescription className="matrix-text opacity-70">
-                Insert satellite imagery for deep analysis via MCP neural network
+                Configure AI agent parameters and upload satellite imagery
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-                            {/* Sample Data Section */}
+
+              {/* Analysis Mode Selection */}
+              <div>
+                <Label className="matrix-text text-lg font-mono block mb-4">
+                  &gt; ANALYSIS MODE:
+                </Label>
+                <div className="grid grid-cols-1 gap-3">
+                  <div
+                    className={`p-4 rounded-lg border-2 cursor-pointer transition-all duration-300 ${
+                      analysisMode === "agent_orchestrated"
+                        ? 'matrix-glow border-green-400 bg-green-900/20'
+                        : 'matrix-border hover:border-green-400 hover:bg-green-900/10'
+                    }`}
+                    onClick={() => setAnalysisMode("agent_orchestrated")}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h3 className="matrix-text font-mono font-bold">🤖 AI Agent Orchestrated</h3>
+                        <p className="matrix-text text-sm opacity-70">
+                          Advanced AI agent uses multiple tools for comprehensive analysis
+                        </p>
+                      </div>
+                      <div className="px-2 py-1 rounded text-xs font-mono font-bold bg-green-900/50 text-green-300 border border-green-500">
+                        RECOMMENDED
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div
+                    className={`p-4 rounded-lg border-2 cursor-pointer transition-all duration-300 ${
+                      analysisMode === "direct_detection"
+                        ? 'matrix-glow border-green-400 bg-green-900/20'
+                        : 'matrix-border hover:border-green-400 hover:bg-green-900/10'
+                    }`}
+                    onClick={() => setAnalysisMode("direct_detection")}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h3 className="matrix-text font-mono font-bold">🔍 Direct Detection</h3>
+                        <p className="matrix-text text-sm opacity-70">
+                          Traditional OpenCV + GPT-4 Vision analysis (legacy mode)
+                        </p>
+                      </div>
+                      <div className="px-2 py-1 rounded text-xs font-mono font-bold bg-blue-900/50 text-blue-300 border border-blue-500">
+                        LEGACY
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Agent Query Configuration (only for agent mode) */}
+              {analysisMode === "agent_orchestrated" && (
+                <div>
+                  <Label className="matrix-text text-lg font-mono block mb-4">
+                    &gt; AGENT ANALYSIS QUERY:
+                  </Label>
+                  <div className="matrix-border p-3 rounded-lg bg-blue-900/10 mb-4">
+                    <p className="matrix-text font-mono text-sm opacity-80">
+                      🤖 <span className="text-blue-400">AGENT INSTRUCTION:</span> Customize what you want the AI agent to focus on during analysis
+                    </p>
+                  </div>
+                  <Textarea
+                    value={userQuery}
+                    onChange={(e) => setUserQuery(e.target.value)}
+                    placeholder="Analyze these satellite images for changes..."
+                    className="matrix-border matrix-text bg-black border-green-400 min-h-[100px] resize-none"
+                    rows={4}
+                  />
+                </div>
+              )}
+
+              {/* Sample Data Section */}
               <div>
                 <Label className="matrix-text text-lg font-mono block mb-4">
                   &gt; SATELLITE IMAGERY SAMPLES:
@@ -406,16 +570,21 @@ export default function Home() {
 
               {/* Execute Button */}
               <Button
-                onClick={handleDetectChanges}
+                onClick={handleAnalysis}
                 disabled={!beforeImage || !afterImage || isProcessing}
                 className="w-full matrix-button text-xl py-6 font-mono font-bold tracking-wider"
               >
                 {isProcessing ? (
                   <span className="matrix-pulse">
-                    &gt; ANALYZING SATELLITE IMAGERY... &lt;
+                    {analysisMode === "agent_orchestrated" 
+                      ? "&gt; AI AGENT ANALYZING... &lt;" 
+                      : "&gt; PROCESSING SATELLITE DATA... &lt;"
+                    }
                   </span>
                 ) : (
-                  "&gt; EXECUTE CHANGE DETECTION &lt;"
+                  analysisMode === "agent_orchestrated" 
+                    ? "&gt; EXECUTE AI AGENT ANALYSIS &lt;"
+                    : "&gt; EXECUTE CHANGE DETECTION &lt;"
                 )}
               </Button>
             </CardContent>
@@ -425,214 +594,93 @@ export default function Home() {
           <Card className="matrix-card matrix-glow">
             <CardHeader className="matrix-scanline">
               <CardTitle className="matrix-text text-2xl font-mono">
-                {'>>'} ANALYSIS RESULTS
+                {'>>'} AI AGENT ANALYSIS RESULTS
               </CardTitle>
               <CardDescription className="matrix-text opacity-70">
-                MCP neural network output and change detection matrix
+                AI agent orchestration output and comprehensive analysis matrix
               </CardDescription>
             </CardHeader>
             <CardContent>
               {results ? (
                 <div className="space-y-6">
-                  {results.success && results.results ? (
+                  {results.success ? (
                     <>
-                      {/* Analysis Method Banner */}
+                      {/* Results Method Banner */}
                       <div className="matrix-border p-3 rounded-lg bg-green-900/20">
                         <div className="matrix-text text-center font-mono">
-                          🔍 SATELLITE CHANGE DETECTION ANALYSIS COMPLETE
+                          {('orchestration_method' in results && results.orchestration_method?.includes('agent')) 
+                            ? "🤖 AI AGENT ORCHESTRATED ANALYSIS COMPLETE"
+                            : "🔍 DIRECT SATELLITE ANALYSIS COMPLETE"
+                          }
                         </div>
                         <div className="matrix-text text-center font-mono text-sm opacity-70 mt-1">
-                          OPENCV PIXEL DETECTION • GPT-4 VISION ANALYSIS • HIGH PRECISION METRICS
+                          {('tools_used' in results && results.tools_used) 
+                            ? `TOOLS USED: ${results.tools_used.map(tool => tool.toUpperCase()).join(' • ')}`
+                            : "OPENCV PIXEL DETECTION • GPT-4 VISION ANALYSIS"
+                          }
                         </div>
                       </div>
 
-                      {/* GPT-4 Vision Analysis */}
-                      {(results as any).ai_analysis && (
-                        <div className="matrix-border p-4 rounded-lg bg-blue-900/20">
+                      {/* Agent Analysis (Primary for agent mode) */}
+                      {('agent_analysis' in results && results.agent_analysis) && (
+                        <div className="matrix-border p-4 rounded-lg bg-purple-900/20">
                           <h3 className="matrix-text text-xl font-mono mb-4">
-                            [🤖 AI EXPERT ANALYSIS]
+                            [🤖 AI AGENT COMPREHENSIVE ANALYSIS]
                           </h3>
                           <div className="matrix-border p-4 rounded bg-black/50">
                             <p className="matrix-text text-sm leading-relaxed whitespace-pre-wrap">
-                              {(results as any).ai_analysis}
+                              {results.agent_analysis}
                             </p>
                           </div>
                           <div className="mt-2 text-xs matrix-text opacity-60">
-                            Powered by {(results as any).model_used || 'GPT-4 Vision'}
+                            Powered by OpenAI Agent with MCP Tools
                           </div>
                         </div>
                       )}
 
-                      {/* Enhanced Hybrid Results */}
-                      {results.results.hybrid_available && results.results.final_assessment ? (
-                        <>
-                          {/* Threat Assessment Banner */}
+                      {/* Significance Assessment (from agent) */}
+                      {(() => {
+                        const assessment = getSignificanceAssessment(results as AgentResults);
+                        if (!assessment) return null;
+                        
+                        return (
                           <div className={`matrix-border p-4 rounded-lg ${
-                            results.results.final_assessment.threat_level === 'HIGH' ? 'bg-red-900/30 border-red-400' :
-                            results.results.final_assessment.threat_level === 'MEDIUM' ? 'bg-yellow-900/30 border-yellow-400' :
+                            assessment.significance_level === 'HIGH' ? 'bg-red-900/30 border-red-400' :
+                            assessment.significance_level === 'MEDIUM' ? 'bg-yellow-900/30 border-yellow-400' :
                             'bg-green-900/10'
                           }`}>
                             <div className="text-center">
                               <div className={`text-2xl font-bold font-mono ${
-                                results.results.final_assessment.threat_level === 'HIGH' ? 'text-red-400' :
-                                results.results.final_assessment.threat_level === 'MEDIUM' ? 'text-yellow-400' :
+                                assessment.significance_level === 'HIGH' ? 'text-red-400' :
+                                assessment.significance_level === 'MEDIUM' ? 'text-yellow-400' :
                                 'text-green-400'
                               }`}>
-                                THREAT LEVEL: {results.results.final_assessment.threat_level}
+                                SIGNIFICANCE: {assessment.significance_level}
                               </div>
                               <div className="matrix-text text-lg mt-2">
-                                CONFIDENCE: {((results.results.final_assessment.confidence || 0) * 100).toFixed(0)}%
+                                URGENCY: {assessment.urgency?.replace(/_/g, ' ')}
+                              </div>
+                              <div className="matrix-text text-sm mt-2 opacity-80">
+                                PATTERN: {assessment.change_pattern?.replace(/_/g, ' ')}
                               </div>
                             </div>
+                            {assessment.recommendation && (
+                              <div className="matrix-border p-3 rounded bg-black/50 mt-4">
+                                <div className="matrix-text text-sm">
+                                  <span className="text-green-400">RECOMMENDATION:</span> {assessment.recommendation}
+                                </div>
+                              </div>
+                            )}
                           </div>
+                        );
+                      })()}
 
-                          {/* Final Assessment */}
-                          <div className="matrix-border p-4 rounded-lg bg-green-900/10">
-                            <h3 className="matrix-text text-xl font-mono mb-4">
-                              [AI ASSESSMENT MATRIX]
-                            </h3>
-                            <div className="space-y-3">
-                              <div className="matrix-border p-3 rounded bg-black/50">
-                                <div className="matrix-text font-mono">
-                                  <span className="text-green-400">STATUS:</span> {
-                                    results.results.final_assessment.has_meaningful_change ? 
-                                    'MEANINGFUL CHANGE DETECTED' : 'NO SIGNIFICANT CHANGE'
-                                  }
-                                </div>
-                              </div>
-                              <div className="matrix-border p-3 rounded bg-black/50">
-                                <div className="matrix-text font-mono">
-                                  <span className="text-green-400">TYPE:</span> {results.results.final_assessment.change_type?.toUpperCase() || 'UNKNOWN'}
-                                </div>
-                              </div>
-                              <div className="matrix-border p-3 rounded bg-black/50">
-                                <div className="matrix-text font-mono text-sm">
-                                  <span className="text-green-400">ANALYSIS:</span> {results.results.final_assessment.reasoning || 'No analysis available'}
-                                </div>
-                              </div>
-                            </div>
-                          </div>
+                      {/* Change Detection Metrics */}
+                      {(() => {
+                        const changeData = getChangeDetectionData(results);
+                        if (!changeData) return null;
 
-                          {/* OpenCV Pixel Analysis */}
-                          {results.results.opencv_results && (
-                            <div className="matrix-border p-4 rounded-lg bg-blue-900/10">
-                              <h3 className="matrix-text text-xl font-mono mb-4">
-                                [PIXEL DETECTION MATRIX]
-                              </h3>
-                              <div className="grid grid-cols-2 gap-4 text-center">
-                                <div className="matrix-border p-3 rounded bg-black/50">
-                                  <div className="matrix-text text-3xl font-bold matrix-pulse">
-                                    {(results.results.opencv_results.change_percentage || 0).toFixed(2)}%
-                                  </div>
-                                  <div className="matrix-text text-sm opacity-70">PIXEL CHANGE</div>
-                                </div>
-                                <div className="matrix-border p-3 rounded bg-black/50">
-                                  <div className="matrix-text text-3xl font-bold matrix-pulse">
-                                    {results.results.opencv_results.contours_count || 0}
-                                  </div>
-                                  <div className="matrix-text text-sm opacity-70">REGIONS</div>
-                                </div>
-                              </div>
-                              <div className="mt-4 matrix-border p-3 rounded bg-black/50">
-                                <div className="matrix-text font-mono text-sm">
-                                  PIXELS: {(results.results.opencv_results.changed_pixels || 0).toLocaleString()} / {(results.results.opencv_results.total_pixels || 0).toLocaleString()}
-                                </div>
-                              </div>
-                            </div>
-                          )}
-
-                          {/* Semantic Analysis */}
-                          {results.results.semantic_results?.available && (
-                            <div className="matrix-border p-4 rounded-lg bg-purple-900/10">
-                              <h3 className="matrix-text text-xl font-mono mb-4">
-                                [SEMANTIC ANALYSIS MATRIX]
-                              </h3>
-                              <div className="space-y-3">
-                                <div className="matrix-border p-3 rounded bg-black/50">
-                                  <div className="matrix-text font-mono">
-                                    <span className="text-green-400">SIMILARITY:</span> {
-                                      ((results.results.semantic_results.semantic_similarity || 0) * 100).toFixed(1)
-                                    }%
-                                  </div>
-                                </div>
-                                {results.results.semantic_results.interpretation && (
-                                  <div className="matrix-border p-3 rounded bg-black/50">
-                                    <div className="matrix-text font-mono text-sm">
-                                      <span className="text-green-400">INTERPRETATION:</span> {results.results.semantic_results.interpretation}
-                                    </div>
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          )}
-
-                          {/* Change Classification */}
-                          {results.results.classification_results?.available && results.results.classification_results.top_categories && (
-                            <div className="matrix-border p-4 rounded-lg bg-orange-900/10">
-                              <h3 className="matrix-text text-xl font-mono mb-4">
-                                [CHANGE CLASSIFICATION MATRIX]
-                              </h3>
-                              <div className="space-y-2">
-                                {results.results.classification_results.top_categories.slice(0, 3).map((category, index) => (
-                                  <div key={index} className="matrix-border p-3 rounded bg-black/50">
-                                    <div className="flex justify-between items-center">
-                                      <div className="matrix-text font-mono">
-                                        {category.category?.toUpperCase() || 'UNKNOWN'}
-                                      </div>
-                                      <div className={`font-mono text-sm ${
-                                        category.likelihood === 'high' ? 'text-green-400' :
-                                        category.likelihood === 'medium' ? 'text-yellow-400' : 'text-red-400'
-                                      }`}>
-                                        {((category.confidence || 0) * 100).toFixed(1)}% ({category.likelihood?.toUpperCase() || 'UNKNOWN'})
-                                      </div>
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-
-                          {/* Change Mask Visualization */}
-                          {results.results.opencv_results?.change_mask_base64 && (
-                            <div className="matrix-border p-4 rounded-lg bg-green-900/10">
-                              <h3 className="matrix-text text-xl font-mono mb-4">
-                                [VISUAL CHANGE MATRIX]
-                              </h3>
-                              <div className="matrix-border rounded-lg overflow-hidden matrix-glow">
-                                <img
-                                  src={`data:image/png;base64,${results.results.opencv_results.change_mask_base64}`}
-                                  alt="Change Detection Mask"
-                                  className="w-full h-auto"
-                                />
-                              </div>
-                            </div>
-                          )}
-
-                          {/* Processing Performance */}
-                          {results.results.processing_time && (
-                            <div className="matrix-border p-4 rounded-lg bg-gray-900/10">
-                              <h3 className="matrix-text text-xl font-mono mb-4">
-                                [PROCESSING PERFORMANCE]
-                              </h3>
-                              <div className="grid grid-cols-2 gap-4">
-                                <div className="matrix-border p-3 rounded bg-black/50">
-                                  <div className="matrix-text font-mono text-sm">
-                                    <span className="text-green-400">OPENCV:</span> {results.results.processing_time?.opencv_stage || 'N/A'}
-                                  </div>
-                                </div>
-                                <div className="matrix-border p-3 rounded bg-black/50">
-                                  <div className="matrix-text font-mono text-sm">
-                                    <span className="text-green-400">CLIP:</span> {results.results.processing_time?.clip_stage || 'N/A'}
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          )}
-                        </>
-                      ) : (
-                        /* Simplified Results Display */
-                        <>
-                          {/* Key Metrics Overview */}
+                        return (
                           <div className="matrix-border p-4 rounded-lg bg-green-900/10">
                             <h3 className="matrix-text text-xl font-mono mb-4">
                               [📊 CHANGE DETECTION METRICS]
@@ -642,82 +690,145 @@ export default function Home() {
                             <div className="matrix-border p-4 rounded-lg bg-black/50 mb-4">
                               <div className="text-center">
                                 <div className="matrix-text text-5xl font-bold matrix-pulse mb-2">
-                                  {(results.results.change_percentage || 0).toFixed(2)}%
+                                  {(changeData.change_percentage || 0).toFixed(2)}%
                                 </div>
                                 <div className="matrix-text text-lg opacity-80">OF IMAGE AREA CHANGED</div>
                                 <div className="matrix-text text-sm opacity-60 mt-1">
-                                  {results.results.change_percentage && results.results.change_percentage > 5 
+                                  {changeData.change_percentage && changeData.change_percentage > 5 
                                     ? "🔴 SIGNIFICANT CHANGE DETECTED" 
-                                    : results.results.change_percentage && results.results.change_percentage > 1 
-                                    ? "🟡 MODERATE CHANGE DETECTED" 
+                                    : changeData.change_percentage > 1 
+                                    ? "🟡 MODERATE CHANGE DETECTED"
                                     : "🟢 MINIMAL CHANGE DETECTED"
                                   }
                                 </div>
                               </div>
                             </div>
 
-                            {/* Detailed Analytics Grid */}
-                            <div className="grid grid-cols-3 gap-4">
-                              <div className="matrix-border p-3 rounded bg-black/50 text-center">
-                                <div className="matrix-text text-2xl font-bold">
-                                  {(results.results.changed_pixels || 0).toLocaleString()}
+                            {/* Detailed Metrics Grid */}
+                            <div className="grid grid-cols-2 gap-4 mb-4">
+                              <div className="matrix-border p-3 rounded bg-black/50">
+                                <div className="matrix-text text-2xl font-bold matrix-pulse text-center">
+                                  {changeData.contours_count || 0}
                                 </div>
-                                <div className="matrix-text text-xs opacity-70">PIXELS CHANGED</div>
+                                <div className="matrix-text text-sm opacity-70 text-center">CHANGE REGIONS</div>
                               </div>
-                              <div className="matrix-border p-3 rounded bg-black/50 text-center">
-                                <div className="matrix-text text-2xl font-bold">
-                                  {results.results.contours_count || 0}
+                              <div className="matrix-border p-3 rounded bg-black/50">
+                                <div className="matrix-text text-lg font-bold text-center">
+                                  {changeData.analysis_method?.toUpperCase() || 'OPENCV'}
                                 </div>
-                                <div className="matrix-text text-xs opacity-70">CHANGE REGIONS</div>
+                                <div className="matrix-text text-sm opacity-70 text-center">ANALYSIS METHOD</div>
                               </div>
-                              <div className="matrix-border p-3 rounded bg-black/50 text-center">
-                                <div className="matrix-text text-2xl font-bold">
-                                  {((results.results.total_pixels || 0) / 1000000).toFixed(1)}M
-                                </div>
-                                <div className="matrix-text text-xs opacity-70">TOTAL PIXELS</div>
+                            </div>
+
+                            {/* Pixel Details */}
+                            <div className="matrix-border p-3 rounded bg-black/50">
+                              <div className="matrix-text font-mono text-sm">
+                                PIXELS CHANGED: {(changeData.changed_pixels || 0).toLocaleString()} / {(changeData.total_pixels || 0).toLocaleString()}
                               </div>
                             </div>
                           </div>
+                        );
+                      })()}
 
-                          {/* Change Visualization */}
-                          {results.results.change_mask_base64 && (
-                            <div className="matrix-border p-4 rounded-lg bg-purple-900/10">
-                              <h3 className="matrix-text text-xl font-mono mb-4">
-                                [🎯 CHANGE VISUALIZATION]
-                              </h3>
-                              <div className="matrix-border rounded-lg overflow-hidden matrix-glow">
-                                <img
-                                  src={`data:image/png;base64,${results.results.change_mask_base64}`}
-                                  alt="Change Detection Visualization"
-                                  className="w-full h-auto"
-                                />
-                              </div>
-                              <div className="mt-2 matrix-text text-sm opacity-70">
-                                🟢 Green areas highlight detected changes between the before and after images
-                              </div>
+                      {/* GPT-4 Vision Analysis */}
+                      {(() => {
+                        const visionAnalysis = getVisionAnalysis(results);
+                        if (!visionAnalysis) return null;
+
+                        return (
+                          <div className="matrix-border p-4 rounded-lg bg-blue-900/20">
+                            <h3 className="matrix-text text-xl font-mono mb-4">
+                              [👁️ GPT-4 VISION ANALYSIS]
+                            </h3>
+                            <div className="matrix-border p-4 rounded bg-black/50">
+                              <p className="matrix-text text-sm leading-relaxed whitespace-pre-wrap">
+                                {visionAnalysis}
+                              </p>
                             </div>
-                          )}
-                        </>
+                            <div className="mt-2 text-xs matrix-text opacity-60">
+                              {('model_used' in results && results.model_used) 
+                                ? `Powered by ${results.model_used}`
+                                : 'Powered by GPT-4 Vision'
+                              }
+                            </div>
+                          </div>
+                        );
+                      })()}
+
+                      {/* Change Mask Visualization */}
+                      {(() => {
+                        const changeData = getChangeDetectionData(results);
+                        if (!changeData?.change_mask_base64) return null;
+
+                        return (
+                          <div className="matrix-border p-4 rounded-lg bg-green-900/10">
+                            <h3 className="matrix-text text-xl font-mono mb-4">
+                              [🎯 VISUAL CHANGE MATRIX]
+                            </h3>
+                            <div className="matrix-border rounded-lg overflow-hidden matrix-glow">
+                              <img
+                                src={`data:image/png;base64,${changeData.change_mask_base64}`}
+                                alt="Change Detection Mask"
+                                className="w-full h-auto"
+                              />
+                            </div>
+                            <div className="mt-2 text-xs matrix-text opacity-60 text-center">
+                              Green regions indicate detected changes
+                            </div>
+                          </div>
+                        );
+                      })()}
+
+                      {/* Tool Results Debug (for agent mode) */}
+                      {('tool_results' in results && results.tool_results && results.tool_results.length > 0) && (
+                        <div className="matrix-border p-4 rounded-lg bg-gray-900/10">
+                          <h3 className="matrix-text text-xl font-mono mb-4">
+                            [🛠️ TOOL EXECUTION DETAILS]
+                          </h3>
+                          <div className="space-y-2">
+                            {results.tool_results.map((tool, index) => (
+                              <div key={index} className="matrix-border p-3 rounded bg-black/50">
+                                <div className="flex justify-between items-center">
+                                  <div className="matrix-text font-mono">
+                                    {tool.tool_name.replace(/_/g, ' ').toUpperCase()}
+                                  </div>
+                                  <div className={`font-mono text-sm ${
+                                    tool.result.success ? 'text-green-400' : 'text-red-400'
+                                  }`}>
+                                    {tool.result.success ? '✅ SUCCESS' : '❌ FAILED'}
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
                       )}
                     </>
                   ) : (
-                    <div className="matrix-border p-6 rounded-lg bg-red-900/20 border-red-400">
-                      <h3 className="matrix-text text-xl font-mono mb-2 text-red-400">
-                        [SYSTEM ERROR]
+                    /* Error Display */
+                    <div className="matrix-border p-4 rounded-lg bg-red-900/20 border-red-400">
+                      <h3 className="matrix-text text-xl font-mono mb-4 text-red-400">
+                        [❌ ANALYSIS FAILED]
                       </h3>
-                      <p className="matrix-text text-red-300">
-                        {results.error || "Unknown error occurred during neural network processing"}
-                      </p>
+                      <div className="matrix-border p-4 rounded bg-black/50">
+                        <p className="matrix-text text-sm">
+                          {results.error || 'Unknown error occurred during analysis'}
+                        </p>
+                      </div>
                     </div>
                   )}
                 </div>
               ) : (
-                <div className="text-center py-12">
-                  <div className="matrix-text opacity-50 text-xl font-mono">
-                    &gt; AWAITING INPUT DATA
+                /* No Results Yet */
+                <div className="matrix-border p-8 rounded-lg text-center bg-blue-900/10">
+                  <div className="matrix-text opacity-50 font-mono">
+                    {analysisMode === "agent_orchestrated" 
+                      ? "🤖 AI AGENT READY FOR SATELLITE ANALYSIS"
+                      : "🔍 MATRIX SYSTEM READY FOR CHANGE DETECTION"
+                    }
                   </div>
-                  <div className="matrix-text opacity-30 text-sm mt-4 font-mono">
-                    Upload surveillance imagery to begin MCP analysis...
+                  <div className="matrix-text opacity-30 font-mono text-sm mt-2">
+                    Upload images and execute analysis to see results
                   </div>
                 </div>
               )}
