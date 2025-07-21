@@ -520,10 +520,9 @@ Provide clear, structured responses that combine technical analysis with practic
                     tool_name = tool_call.function.name
                     tool_args = json.loads(tool_call.function.arguments)
                     
-                    # Add image data to tool arguments
-                    if "before_image_base64" in tool_args:
+                    # Add image data to tool arguments for tools that need them
+                    if tool_name in ["detect_image_changes", "analyze_images_with_gpt4_vision"]:
                         tool_args["before_image_base64"] = before_image_base64
-                    if "after_image_base64" in tool_args:
                         tool_args["after_image_base64"] = after_image_base64
                     
                     # Execute the MCP tool
