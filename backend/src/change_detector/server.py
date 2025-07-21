@@ -28,11 +28,23 @@ if os.getenv('OPENAI_API_KEY'):
 else:
     print("⚠️ OpenAI API key not found - Agent and GPT-4 Vision analysis will be unavailable")
 
-# Initialize FastMCP server for tools
-mcp = FastMCP("Satellite Change Detection Agent Tools")
-
-# Get the FastAPI app from FastMCP but enhance it
-app = mcp.get_fastapi_app()
+# Initialize FastMCP server for tools with error handling
+try:
+    mcp = FastMCP("Satellite Change Detection Agent Tools")
+    print("✅ FastMCP server initialized")
+    
+    # Get the FastAPI app from FastMCP but enhance it
+    app = mcp.get_fastapi_app()
+    print("✅ FastAPI app created from FastMCP")
+    
+except Exception as e:
+    print(f"❌ FastMCP initialization failed: {e}")
+    print("🔄 Falling back to pure FastAPI")
+    
+    # Fallback to pure FastAPI if FastMCP fails
+    from fastapi import FastAPI
+    app = FastAPI()
+    mcp = None
 
 # Enhance the FastAPI app configuration
 app.title = "AI Agent-Powered Satellite Change Detector"
@@ -225,7 +237,8 @@ Keep your analysis concise but informative, as if briefing a decision-maker."""
         return None
 
 # MCP Tools for the Agent
-@mcp.tool()
+# These will be created as standalone functions that can be called directly if MCP fails
+
 async def detect_image_changes(before_image_base64: str, after_image_base64: str) -> Dict[str, Any]:
     """
     Detect changes between two satellite images using OpenCV computer vision.
@@ -258,7 +271,6 @@ async def detect_image_changes(before_image_base64: str, after_image_base64: str
             "tool_used": "opencv_change_detection"
         }
 
-@mcp.tool()
 async def analyze_images_with_gpt4_vision(before_image_base64: str, after_image_base64: str, change_context: Optional[str] = None) -> Dict[str, Any]:
     """
     Analyze satellite images using GPT-4 Vision for detailed explanations and insights.
@@ -313,7 +325,6 @@ async def analyze_images_with_gpt4_vision(before_image_base64: str, after_image_
             "tool_used": "gpt4_vision_analysis"
         }
 
-@mcp.tool()
 async def assess_change_significance(change_percentage: float, contours_count: int, image_context: Optional[str] = None) -> Dict[str, Any]:
     """
     Assess the significance and potential impact of detected changes.
@@ -370,6 +381,16 @@ async def assess_change_significance(change_percentage: float, contours_count: i
             "error": str(e),
             "tool_used": "change_significance_assessment"
         }
+
+# Register MCP tools if FastMCP is available
+if mcp:
+    try:
+        mcp.tool()(detect_image_changes)
+        mcp.tool()(analyze_images_with_gpt4_vision)
+        mcp.tool()(assess_change_significance)
+        print("✅ MCP tools registered successfully")
+    except Exception as e:
+        print(f"⚠️ MCP tool registration failed: {e}")
 
 # OpenAI Agent Integration
 class SatelliteChangeDetectionAgent:
@@ -568,11 +589,18 @@ Provide clear, structured responses that combine technical analysis with practic
                 "orchestration_method": "openai_agent_with_mcp_tools"
             }
 
-# Initialize agent
+# Initialize agent with error handling
 agent = None
-if openai_client:
-    agent = SatelliteChangeDetectionAgent(openai_client)
-    print("✅ OpenAI Agent initialized with MCP tools")
+try:
+    if openai_client:
+        agent = SatelliteChangeDetectionAgent(openai_client)
+        print("✅ OpenAI Agent initialized with MCP tools")
+    else:
+        print("⚠️ OpenAI Agent not initialized - API key not available")
+except Exception as e:
+    print(f"❌ OpenAI Agent initialization failed: {e}")
+    print("🔄 Server will continue without agent capabilities")
+    agent = None
 
 # FastAPI endpoints
 @app.get("/")
@@ -633,7 +661,17 @@ async def agent_analyze_endpoint(request: AgentRequest):
         if not agent:
             return {
                 "success": False,
-                "error": "OpenAI Agent not available - API key may be missing"
+                "error": "OpenAI Agent not available - API key may be missing or agent initialization failed",
+                "fallback_suggestion": "Use /api/detect-changes for direct analysis",
+                "orchestration_method": "agent_unavailable"
+            }
+        
+        # Validate OpenAI client is still available
+        if not openai_client:
+            return {
+                "success": False,
+                "error": "OpenAI client not available - API key configuration issue",
+                "orchestration_method": "openai_client_unavailable"
             }
         
         result = await agent.analyze_satellite_images(
@@ -645,10 +683,12 @@ async def agent_analyze_endpoint(request: AgentRequest):
         return result
         
     except Exception as e:
+        print(f"Agent analysis error: {e}")
         return {
             "success": False,
-            "error": str(e),
-            "orchestration_method": "openai_agent_with_mcp_tools"
+            "error": f"Agent analysis failed: {str(e)}",
+            "fallback_suggestion": "Use /api/detect-changes for direct analysis",
+            "orchestration_method": "agent_error"
         }
 
 @app.post("/api/detect-changes")
@@ -719,7 +759,7 @@ if __name__ == "__main__":
     print(f"🔑 OpenAI API key: {'Set' if os.getenv('OPENAI_API_KEY') else 'Not set'}")
     print("🤖 Using OpenAI Agent orchestrating FastMCP tools")
     
-    # Test basic imports
+    # Test basic imports with detailed error reporting
     try:
         import cv2
         print(f"✅ OpenCV version: {cv2.__version__}")
@@ -732,6 +772,37 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"❌ NumPy import failed: {e}")
     
+    # Check system status
+    print("\n🔍 System Status Check:")
+    print(f"📦 FastMCP available: {mcp is not None}")
+    print(f"🤖 OpenAI client available: {openai_client is not None}")
+    print(f"🎯 Agent available: {agent is not None}")
+    print(f"🔧 App object: {type(app).__name__}")
+    
+    # Test health endpoint before starting server
+    try:
+        import asyncio
+        
+        async def test_health():
+            try:
+                # Test basic functionality
+                test_array = np.array([[1, 2], [3, 4]])
+                cv2_available = hasattr(cv2, 'cvtColor')
+                print(f"✅ Pre-startup health check passed")
+                print(f"   - NumPy test: {test_array.shape}")
+                print(f"   - OpenCV available: {cv2_available}")
+                return True
+            except Exception as e:
+                print(f"❌ Pre-startup health check failed: {e}")
+                return False
+        
+        health_ok = asyncio.run(test_health())
+        if not health_ok:
+            print("⚠️ Health check failed, but attempting to start server anyway...")
+    
+    except Exception as e:
+        print(f"⚠️ Health check error: {e}")
+    
     # Run the server
     import uvicorn
     
@@ -739,13 +810,16 @@ if __name__ == "__main__":
     port = int(os.getenv("PORT", 8000))
     host = "0.0.0.0"  # Bind to all interfaces for production
     
-    print(f"🌐 Starting server on {host}:{port}")
+    print(f"\n🌐 Starting server on {host}:{port}")
     print("📡 Health check endpoint: /api/health")
     print("🧪 Test endpoint: /api/test")
     print("🤖 Agent analysis endpoint: /api/agent-analyze")
+    print("🔄 Legacy endpoints: /api/detect-changes, /api/analyze-changes")
     
     try:
         uvicorn.run(app, host=host, port=port, log_level="info")
     except Exception as e:
         print(f"❌ Server startup failed: {e}")
+        import traceback
+        traceback.print_exc()
         raise
