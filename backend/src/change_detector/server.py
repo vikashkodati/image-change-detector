@@ -505,11 +505,11 @@ The satellite images are already available to your tools. Begin analysis immedia
             response = await asyncio.get_event_loop().run_in_executor(
                 None,
                 lambda: self.client.chat.completions.create(
-                    model="gpt-4-1106-preview",
+                    model="gpt-4",
                     messages=messages,
                     tools=self.tools,
                     tool_choice="auto",
-                    max_tokens=1000
+                    max_tokens=500
                 )
             )
             
@@ -544,25 +544,31 @@ The satellite images are already available to your tools. Begin analysis immedia
                         "result": result
                     })
                     
-                    # Add tool result to conversation
+                    # Add tool result to conversation (clean large data to avoid token limits)
+                    clean_result = dict(result)
+                    # Remove base64 image data from conversation to avoid token overflow
+                    if "results" in clean_result and isinstance(clean_result["results"], dict):
+                        if "change_mask_base64" in clean_result["results"]:
+                            clean_result["results"]["change_mask_base64"] = "[IMAGE_DATA_REMOVED]"
+                    
                     messages.append({
-                        "role": "assistant",
+                        "role": "assistant", 
                         "content": assistant_message.content,
                         "tool_calls": assistant_message.tool_calls
                     })
                     messages.append({
                         "role": "tool",
                         "tool_call_id": tool_call.id,
-                        "content": json.dumps(result)
+                        "content": json.dumps(clean_result)
                     })
                 
                 # Get final response from agent after tool execution
                 final_response = await asyncio.get_event_loop().run_in_executor(
                     None,
                     lambda: self.client.chat.completions.create(
-                        model="gpt-4-1106-preview",
+                        model="gpt-4",
                         messages=messages,
-                        max_tokens=1000
+                        max_tokens=500
                     )
                 )
                 
