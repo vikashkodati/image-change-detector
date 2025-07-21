@@ -1,28 +1,53 @@
 # Matrix Change Detector - Development Knowledge Base
 
 ## 🕶️ Project Overview
-**Matrix Change Detector** is a cyberpunk-themed satellite image analysis application that combines **FastMCP (Model Context Protocol)** backend with a **Matrix movie-inspired frontend**. The system provides AI-powered change detection using OpenCV computer vision and GPT-4 Vision analysis.
+**Matrix Change Detector** is a cyberpunk-themed satellite image analysis application powered by an **OpenAI Agent that orchestrates FastMCP tools**. The system provides intelligent, AI-driven change detection with a sophisticated **Matrix movie-inspired frontend**.
 
-### 🎯 Current Status: **PRODUCTION READY**
+### 🎯 Current Status: **AI AGENT ENHANCED**
+- **AI System**: OpenAI Agent orchestrating specialized MCP tools
 - **Theme**: Complete Matrix cyberpunk interface with digital rain
-- **Backend**: FastMCP server with MCP tools + REST API bridge
-- **Frontend**: Next.js with authentic Matrix UI elements
+- **Backend**: FastMCP server + OpenAI Agent + REST API bridge
+- **Frontend**: Next.js with agent configuration and results display
 - **Deployment**: Railway (backend) + Vercel (frontend) ready
-- **Testing**: Comprehensive local and production testing
+- **Intelligence**: Multi-tool reasoning with significance assessment
 
-## 🏗️ Architecture Implementation
+## 🤖 AI Agent Architecture
 
-### **System Design**
+### **Agent System Design**
+```
+User Query → OpenAI Agent (GPT-4) → Tool Selection & Orchestration
+    ↓
+MCP Tool 1: detect_image_changes (OpenCV)
+    ↓
+MCP Tool 2: analyze_images_with_gpt4_vision (AI Analysis)
+    ↓
+MCP Tool 3: assess_change_significance (Assessment)
+    ↓
+Agent Synthesis → Comprehensive Analysis Report
+```
+
+### **Agent Capabilities**
+- **Intelligent Tool Selection**: Agent chooses appropriate tools based on user query
+- **Sequential Reasoning**: Logical tool execution (detect → analyze → assess)
+- **Significance Assessment**: HIGH/MEDIUM/LOW urgency classification
+- **Pattern Recognition**: Change type identification and recommendations
+- **Comprehensive Reporting**: Synthesized analysis from multiple tools
+
+## 🏗️ System Implementation
+
+### **Enhanced Architecture**
 ```
 Matrix Rain Background (Canvas) 
     ↓
-Cyberpunk UI Components (React + Tailwind)
+Agent Control Panel (React + Tailwind)
     ↓
-HTTP REST API (Base64 Images)
+HTTP REST API (/api/agent-analyze)
     ↓
-FastAPI Bridge → MCP Tools
+OpenAI Agent Orchestration (GPT-4)
     ↓
-OpenCV + GPT-4 Vision Processing
+FastMCP Tools Execution
+    ↓
+OpenCV + GPT-4 Vision + Assessment Processing
 ```
 
 ### **Technology Stack Details**
@@ -35,7 +60,8 @@ OpenCV + GPT-4 Vision Processing
 - **Custom CSS** - Glitch effects, scanlines, glow animations
 
 #### 🔧 **Backend Stack**
-- **FastMCP v0.1.0+** - MCP protocol implementation
+- **OpenAI Agent** - GPT-4 powered intelligent orchestration
+- **FastMCP v0.1.0+** - MCP protocol implementation with specialized tools
 - **FastAPI** - REST API bridge for frontend integration
 - **OpenCV-Python 4.8+** - Computer vision processing
 - **OpenAI GPT-4 Vision** - AI semantic analysis
@@ -97,13 +123,42 @@ async def health_check()
     """Server health monitoring"""
 ```
 
-### **REST API Bridge**
+### **AI Agent API Endpoints**
 ```python
-# FastAPI endpoints that call MCP tools
-@app.post("/api/detect-changes")
-@app.post("/api/analyze-changes") 
-@app.post("/api/answer-question")
-@app.get("/api/health")
+# Primary AI Agent endpoint
+@app.post("/api/agent-analyze")      # NEW: Agent orchestrated analysis
+
+# Legacy direct tool endpoints  
+@app.post("/api/detect-changes")     # Direct OpenCV detection
+@app.post("/api/analyze-changes")    # Direct GPT-4 Vision analysis
+
+# System endpoints
+@app.get("/")                        # Root status
+@app.get("/api/health")             # Health check for Railway
+@app.get("/api/test")               # API functionality test
+```
+
+### **Agent Request/Response Format**
+```python
+# Agent request
+{
+  "before_image_base64": "base64...",
+  "after_image_base64": "base64...", 
+  "user_query": "Analyze these satellite images for infrastructure changes"
+}
+
+# Agent response
+{
+  "success": true,
+  "agent_analysis": "Comprehensive analysis text...",
+  "tool_results": [
+    {"tool_name": "detect_image_changes", "result": {...}},
+    {"tool_name": "analyze_images_with_gpt4_vision", "result": {...}},
+    {"tool_name": "assess_change_significance", "result": {...}}
+  ],
+  "tools_used": ["detect_image_changes", "analyze_images_with_gpt4_vision", "assess_change_significance"],
+  "orchestration_method": "openai_agent_with_mcp_tools"
+}
 ```
 
 ### **Change Detection Algorithm**
