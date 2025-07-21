@@ -479,23 +479,26 @@ class SatelliteChangeDetectionAgent:
             # System prompt for the agent
             system_prompt = """You are an expert satellite image analysis agent with access to specialized tools for change detection and assessment.
 
+IMPORTANT: The user has already provided two satellite images (before and after) that are ready for analysis. Do NOT ask for images or any additional information. Start analysis immediately using your tools.
+
 Your role is to:
 1. Use computer vision tools to detect pixel-level changes
 2. Use AI vision analysis for semantic understanding 
 3. Assess the significance and implications of changes
 4. Provide comprehensive, actionable insights
 
-Always use your tools in a logical sequence:
-1. First, detect changes using computer vision
-2. Then, analyze the images with GPT-4 Vision for context
-3. Finally, assess the significance of any changes found
+MANDATORY WORKFLOW - Execute immediately without asking questions:
+1. FIRST: Call detect_image_changes tool to analyze pixel-level differences
+2. SECOND: Call analyze_images_with_gpt4_vision tool for semantic analysis
+3. THIRD: Call assess_change_significance tool based on detection results
+4. FOURTH: Provide comprehensive summary combining all tool results
 
-Provide clear, structured responses that combine technical analysis with practical insights."""
+The satellite images are already available to your tools. Begin analysis immediately with detect_image_changes."""
 
             # Initial conversation with the agent
             messages = [
                 {"role": "system", "content": system_prompt},
-                {"role": "user", "content": f"Please analyze these satellite images: {user_query}"}
+                {"role": "user", "content": f"Execute satellite image change analysis now. User request: {user_query}\n\nThe before and after images are ready. Start with detect_image_changes tool immediately."}
             ]
             
             # Start the agent conversation
