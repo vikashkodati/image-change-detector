@@ -19,7 +19,9 @@ dependencies = [
     "aiohttp>=3.12.14",
     "pydantic>=2.11.7",
     "requests>=2.31.0",
-
+    "supabase>=2.0.0",  # Supabase client for auth, storage, and vector DB
+    "postgrest>=0.16.0",  # PostgreSQL REST client
+    "pgvector>=0.3.0",  # PostgreSQL vector extension support
 ]
 
 [project.optional-dependencies]

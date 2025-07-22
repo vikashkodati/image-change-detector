@@ -16,6 +16,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from openai import OpenAI
 from dotenv import load_dotenv
+from .supabase_client import supabase_client, AnalysisResult
 
 # Load environment variables
 load_dotenv()
@@ -382,13 +383,147 @@ async def assess_change_significance(change_percentage: float, contours_count: i
             "tool_used": "change_significance_assessment"
         }
 
+async def store_analysis_result_tool(
+    before_image_base64: str,
+    after_image_base64: str,
+    change_results: Dict[str, Any],
+    agent_analysis: str = None,
+    tools_used: List[str] = None,
+    user_id: str = None
+) -> Dict[str, Any]:
+    """
+    Store analysis result in Supabase database for history and analytics.
+    
+    Args:
+        before_image_base64: Base64 encoded before image
+        after_image_base64: Base64 encoded after image  
+        change_results: Results from change detection
+        agent_analysis: Optional agent analysis text
+        tools_used: List of tools used in analysis
+        user_id: Optional user identifier
+    
+    Returns:
+        Dictionary containing storage result
+    """
+    try:
+        analysis_id = await supabase_client.store_analysis_result(
+            before_image_base64=before_image_base64,
+            after_image_base64=after_image_base64,
+            change_results=change_results,
+            agent_analysis=agent_analysis,
+            tools_used=tools_used or [],
+            user_id=user_id,
+            processing_time_ms=0  # Could be tracked
+        )
+        
+        if analysis_id:
+            return {
+                "success": True,
+                "analysis_id": analysis_id,
+                "stored_in_database": True,
+                "tool_used": "store_analysis_result"
+            }
+        else:
+            return {
+                "success": False,
+                "error": "Supabase not available",
+                "stored_in_database": False,
+                "tool_used": "store_analysis_result"
+            }
+            
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e),
+            "stored_in_database": False,
+            "tool_used": "store_analysis_result"
+        }
+
+async def find_similar_analyses_tool(
+    change_percentage: float,
+    significance_level: str,
+    limit: int = 5
+) -> Dict[str, Any]:
+    """
+    Find similar analysis results from database for comparison.
+    
+    Args:
+        change_percentage: Percentage of change detected
+        significance_level: HIGH/MEDIUM/LOW/MINIMAL significance
+        limit: Maximum number of results to return
+    
+    Returns:
+        Dictionary containing similar analyses
+    """
+    try:
+        similar_analyses = await supabase_client.find_similar_analyses(
+            change_percentage=change_percentage,
+            significance_level=significance_level,
+            limit=limit
+        )
+        
+        # Convert to serializable format
+        similar_data = []
+        for analysis in similar_analyses:
+            similar_data.append({
+                "id": analysis.id,
+                "change_percentage": analysis.change_percentage,
+                "significance_level": analysis.significance_level,
+                "tools_used": analysis.tools_used,
+                "created_at": analysis.created_at.isoformat(),
+                "processing_time_ms": analysis.processing_time_ms
+            })
+        
+        return {
+            "success": True,
+            "similar_analyses": similar_data,
+            "count": len(similar_data),
+            "tool_used": "find_similar_analyses"
+        }
+        
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e),
+            "similar_analyses": [],
+            "tool_used": "find_similar_analyses"
+        }
+
+async def get_analysis_stats_tool() -> Dict[str, Any]:
+    """
+    Get system-wide analysis statistics and trends.
+    
+    Returns:
+        Dictionary containing analysis statistics
+    """
+    try:
+        stats = await supabase_client.get_analysis_stats()
+        
+        return {
+            "success": True,
+            "stats": stats,
+            "supabase_available": supabase_client.is_connected,
+            "tool_used": "get_analysis_stats"
+        }
+        
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e),
+            "stats": {},
+            "tool_used": "get_analysis_stats"
+        }
+
 # Register MCP tools if FastMCP is available
 if mcp:
     try:
         mcp.tool()(detect_image_changes)
         mcp.tool()(analyze_images_with_gpt4_vision)
         mcp.tool()(assess_change_significance)
-        print("✅ MCP tools registered successfully")
+        mcp.tool()(store_analysis_result_tool)
+        mcp.tool()(find_similar_analyses_tool)
+        mcp.tool()(get_analysis_stats_tool)
+        print("✅ MCP tools registered successfully (including Supabase tools)")
     except Exception as e:
         print(f"⚠️ MCP tool registration failed: {e}")
 
@@ -469,6 +604,81 @@ class SatelliteChangeDetectionAgent:
                         "required": ["change_percentage", "contours_count"]
                     }
                 }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "store_analysis_result_tool",
+                    "description": "Store analysis result in database for history and future reference",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "before_image_base64": {
+                                "type": "string",
+                                "description": "Base64 encoded before image"
+                            },
+                            "after_image_base64": {
+                                "type": "string",
+                                "description": "Base64 encoded after image"
+                            },
+                            "change_results": {
+                                "type": "object",
+                                "description": "Results from change detection analysis"
+                            },
+                            "agent_analysis": {
+                                "type": "string",
+                                "description": "Agent's comprehensive analysis text"
+                            },
+                            "tools_used": {
+                                "type": "array",
+                                "items": {"type": "string"},
+                                "description": "List of tools used in analysis"
+                            },
+                            "user_id": {
+                                "type": "string",
+                                "description": "Optional user identifier"
+                            }
+                        },
+                        "required": ["before_image_base64", "after_image_base64", "change_results"]
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "find_similar_analyses_tool",
+                    "description": "Find similar analysis results from database for comparison and context",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "change_percentage": {
+                                "type": "number",
+                                "description": "Percentage of change detected"
+                            },
+                            "significance_level": {
+                                "type": "string",
+                                "description": "Significance level (HIGH/MEDIUM/LOW/MINIMAL)"
+                            },
+                            "limit": {
+                                "type": "integer",
+                                "description": "Maximum number of similar analyses to return"
+                            }
+                        },
+                        "required": ["change_percentage", "significance_level"]
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "get_analysis_stats_tool",
+                    "description": "Get system-wide analysis statistics and trends",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {},
+                        "required": []
+                    }
+                }
             }
         ]
     
@@ -477,7 +687,7 @@ class SatelliteChangeDetectionAgent:
         
         try:
             # System prompt for the agent
-            system_prompt = """You are an expert satellite image analysis agent with access to specialized tools for change detection and assessment.
+            system_prompt = """You are an expert satellite image analysis agent with access to specialized tools for change detection, assessment, and database operations.
 
 IMPORTANT: The user has already provided two satellite images (before and after) that are ready for analysis. Do NOT ask for images or any additional information. Start analysis immediately using your tools.
 
@@ -485,13 +695,25 @@ Your role is to:
 1. Use computer vision tools to detect pixel-level changes
 2. Use AI vision analysis for semantic understanding 
 3. Assess the significance and implications of changes
-4. Provide comprehensive, actionable insights
+4. Store results in database for future reference and learning
+5. Find similar analyses for additional context
+6. Provide comprehensive, actionable insights
 
-MANDATORY WORKFLOW - Execute immediately without asking questions:
+ENHANCED WORKFLOW - Execute immediately without asking questions:
 1. FIRST: Call detect_image_changes tool to analyze pixel-level differences
 2. SECOND: Call analyze_images_with_gpt4_vision tool for semantic analysis
 3. THIRD: Call assess_change_significance tool based on detection results
-4. FOURTH: Provide comprehensive summary combining all tool results
+4. FOURTH: Call find_similar_analyses_tool to get historical context
+5. FIFTH: Call store_analysis_result_tool to save results for future reference
+6. SIXTH: Provide comprehensive summary combining all tool results with historical context
+
+AVAILABLE TOOLS:
+- detect_image_changes: OpenCV computer vision analysis
+- analyze_images_with_gpt4_vision: GPT-4 Vision semantic understanding
+- assess_change_significance: Significance and urgency assessment
+- find_similar_analyses_tool: Database search for similar historical analyses
+- store_analysis_result_tool: Save results for future reference
+- get_analysis_stats_tool: System-wide analytics (optional)
 
 The satellite images are already available to your tools. Begin analysis immediately with detect_image_changes."""
 
@@ -535,6 +757,12 @@ The satellite images are already available to your tools. Begin analysis immedia
                         result = await analyze_images_with_gpt4_vision(**tool_args)
                     elif tool_name == "assess_change_significance":
                         result = await assess_change_significance(**tool_args)
+                    elif tool_name == "store_analysis_result_tool":
+                        result = await store_analysis_result_tool(**tool_args)
+                    elif tool_name == "find_similar_analyses_tool":
+                        result = await find_similar_analyses_tool(**tool_args)
+                    elif tool_name == "get_analysis_stats_tool":
+                        result = await get_analysis_stats_tool(**tool_args)
                     else:
                         result = {"error": f"Unknown tool: {tool_name}"}
                     
@@ -624,15 +852,20 @@ async def health_endpoint():
         test_array = np.array([[1, 2], [3, 4]])
         cv2_available = hasattr(cv2, 'cvtColor')
         
+        # Check Supabase health
+        supabase_health = await supabase_client.health_check()
+        
         return {
             "status": "healthy",
-            "service": "AI Agent-Powered Satellite Change Detector",
-            "version": "2.0.0",
+            "service": "AI Agent-Powered Satellite Change Detector with Supabase",
+            "version": "2.1.0",
             "opencv_available": cv2_available,
             "numpy_available": True,
             "openai_available": openai_client is not None,
             "agent_available": agent is not None,
-            "mcp_tools_available": True
+            "mcp_tools_available": True,
+            "supabase_status": supabase_health,
+            "database_features": supabase_client.is_connected
         }
     except Exception as e:
         return {
@@ -785,6 +1018,7 @@ if __name__ == "__main__":
     print(f"📦 FastMCP available: {mcp is not None}")
     print(f"🤖 OpenAI client available: {openai_client is not None}")
     print(f"🎯 Agent available: {agent is not None}")
+    print(f"🗄️ Supabase connected: {supabase_client.is_connected}")
     print(f"🔧 App object: {type(app).__name__}")
     
     # Test health endpoint before starting server
