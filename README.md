@@ -1,11 +1,21 @@
 # 🕶️ Matrix Change Detector
 
-**AI-powered satellite image analysis with a cyberpunk Matrix-themed interface**
+**OpenAI Agent-powered satellite image analysis with cyberpunk Matrix interface**
 
 [![Deploy Backend](https://railway.app/button.svg)](https://railway.app/template/fastmcp-image-detector)
 [![Deploy Frontend](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/your-username/your-repo/tree/main/frontend)
 
-A satellite image change detection web application built with **Next.js** and **FastMCP**. The system analyzes before/after satellite images to detect pixel-level changes and provides AI-powered semantic analysis with a **Matrix movie-inspired cyberpunk interface**.
+An intelligent satellite image change detection web application featuring an **OpenAI Agent that orchestrates FastMCP tools** for comprehensive analysis. The system uses **computer vision, AI vision analysis, and significance assessment** to detect and explain changes in satellite imagery, all wrapped in a **Matrix movie-inspired cyberpunk interface**.
+
+## 🧠 Core Problem & Solution
+
+**Problem**: Traditional satellite image analysis requires manual interpretation and lacks intelligent context understanding.
+
+**Solution**: AI Agent orchestration system that:
+- 🔍 **Detects** pixel-level changes using OpenCV computer vision
+- 👁️ **Analyzes** semantic meaning with GPT-4 Vision
+- 📊 **Assesses** significance and urgency levels automatically
+- 🤖 **Synthesizes** comprehensive insights through intelligent agent reasoning
 
 ## ✨ Features
 
@@ -16,12 +26,19 @@ A satellite image change detection web application built with **Next.js** and **
 - 📺 **Scanlines** - Moving lines across interface elements  
 - 💚 **Neon Glow** - Green borders and shadows throughout
 
-### 🧠 **MCP-Powered Analysis**
-- **OpenCV Change Detection** - Pixel-level difference analysis
-- **GPT-4 Vision Integration** - AI semantic analysis of changes
-- **FastMCP Architecture** - Tool-based backend with REST API bridge
+### 🤖 **AI Agent Intelligence**
+- **OpenAI Agent Orchestration** - GPT-4 powered tool selection and reasoning
+- **3-Stage Analysis Pipeline** - Detection → Vision Analysis → Significance Assessment
+- **Multi-Tool Coordination** - Intelligent workflow execution
+- **Significance Classification** - HIGH/MEDIUM/LOW urgency levels with recommendations
+- **Comprehensive Reporting** - Synthesized insights from multiple AI systems
+
+### 🔧 **MCP-Powered Backend**
+- **FastMCP Architecture** - Modern tool-based server implementation
+- **OpenCV Change Detection** - Pixel-level computer vision analysis
+- **GPT-4 Vision Integration** - AI semantic understanding of changes
+- **REST API Bridge** - HTTP endpoints for frontend integration
 - **Real-time Processing** - Live feedback during analysis
-- **High-resolution Support** - Handles large satellite imagery
 
 ### 📡 **Sample Data**
 - **Hurricane Ian** - Florida power grid analysis (NASA Black Marble 7680x2160)
@@ -144,55 +161,52 @@ python deploy.py
 
 ## 🏗️ Architecture
 
-### **System Overview**
+### **AI Agent Architecture**
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
 │                    MATRIX USER INTERFACE                            │
 ├─────────────────────────────────────────────────────────────────────┤
-│                 Next.js 14 + Matrix Theme                          │
+│       Next.js 14 + Matrix Theme + Agent Configuration              │
 │  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐    │
-│  │ Digital Rain    │  │ Cyberpunk UI    │  │ Glitch Effects  │    │
-│  │ Background      │  │ Components      │  │ & Animations    │    │
+│  │ Digital Rain    │  │ Agent Control   │  │ Results Display │    │
+│  │ Background      │  │ Panel           │  │ & Analytics     │    │
 │  └─────────────────┘  └─────────────────┘  └─────────────────┘    │
 │                                                                     │
 │  ┌─────────────────────────────────────────────────────────────┐   │
-│  │        Matrix Canvas + Shadcn/ui + Tailwind CSS            │   │
+│  │    Agent Mode Selection + Query Configuration              │   │
 │  └─────────────────────────────────────────────────────────────┘   │
 └─────────────────────────────────────────────────────────────────────┘
                                    │
                                    │ HTTP REST API
-                                   │ (Base64 Images)
+                                   │ (/api/agent-analyze)
                                    ▼
 ┌─────────────────────────────────────────────────────────────────────┐
-│              FastMCP Server + FastAPI Bridge                       │
+│                    OPENAI AGENT ORCHESTRATION                      │
 ├─────────────────────────────────────────────────────────────────────┤
-│                       MCP TOOLS AVAILABLE:                         │
-│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐    │
-│  │detect_image_    │  │analyze_changes_ │  │answer_question_ │    │
-│  │changes          │  │with_ai          │  │about_changes    │    │
-│  │(OpenCV)         │  │(GPT-4 Vision)   │  │(Interactive)    │    │
-│  └─────────────────┘  └─────────────────┘  └─────────────────┘    │
-│                                                                     │
+│                      GPT-4 Agent Controller                        │
 │  ┌─────────────────────────────────────────────────────────────┐   │
-│  │         REST API Endpoints (/api/detect-changes)           │   │
-│  │           (Bridge to MCP Tool Functions)                   │   │
+│  │  INTELLIGENT TOOL SELECTION & WORKFLOW EXECUTION          │   │
+│  │                                                             │   │
+│  │  Step 1: detect_image_changes (OpenCV)                    │   │
+│  │  Step 2: analyze_images_with_gpt4_vision (AI Analysis)    │   │
+│  │  Step 3: assess_change_significance (Assessment)          │   │
+│  │  Step 4: Synthesize comprehensive report                  │   │
 │  └─────────────────────────────────────────────────────────────┘   │
 └─────────────────────────────────────────────────────────────────────┘
                                    │
-                      ┌─────────────┴─────────────┐
-                      │                           │
-                      ▼                           ▼
-            ┌─────────────────┐         ┌─────────────────┐
-            │   OpenCV        │         │   OpenAI        │
-            │   Computer      │         │   GPT-4 Vision  │
-            │   Vision        │         │      API        │
-            │                 │         │                 │
-            │  • Grayscale    │         │  • Semantic     │
-            │  • Thresholding │         │    Analysis     │
-            │  • Contours     │         │  • Natural Lang │
-            │  • Pixel Diff   │         │    Descriptions │
-            │  • Statistics   │         │  • Interactive  │
-            └─────────────────┘         └─────────────────┘
+                     ┌─────────────┼─────────────┐
+                     │             │             │
+                     ▼             ▼             ▼
+        ┌─────────────────┐ ┌─────────────┐ ┌─────────────────┐
+        │   MCP TOOL 1    │ │ MCP TOOL 2  │ │   MCP TOOL 3    │
+        │detect_image_    │ │analyze_     │ │assess_change_   │
+        │changes          │ │images_with_ │ │significance     │
+        │                 │ │gpt4_vision  │ │                 │
+        │• OpenCV Proc.   │ │• GPT-4 Vision│ │• Classification │
+        │• Pixel Diff     │ │• Semantic    │ │• Urgency Levels │
+        │• Statistics     │ │  Analysis    │ │• Recommendations│
+        │• Change Mask    │ │• Context     │ │• Pattern Recog. │
+        └─────────────────┘ └─────────────┘ └─────────────────┘
 ```
 
 ### **Technology Stack**
@@ -207,15 +221,17 @@ Next.js 14 + TypeScript
 └── Matrix CSS animations (Glitch, scanlines, glow)
 ```
 
-#### 🔧 **Backend Matrix**
+#### 🤖 **Backend AI Stack**
 ```
-Python 3.12 + FastMCP
+Python 3.12 + OpenAI Agent + FastMCP
+├── OpenAI Agent (GPT-4 tool orchestration)
 ├── FastMCP (MCP Protocol implementation)
 ├── FastAPI (REST API bridge)
-├── OpenCV (Computer vision processing)
+├── OpenCV (Computer vision processing)  
 ├── GPT-4 Vision (AI semantic analysis)
 ├── NumPy (Numerical operations)
-└── Uvicorn (ASGI server)
+├── Uvicorn (ASGI server)
+└── Tool Coordination (Agent workflow management)
 ```
 
 #### 🌐 **Deployment Stack**
@@ -253,8 +269,12 @@ curl http://localhost:8000/api/health
 # API documentation
 open http://localhost:8000/docs
 
-# Test change detection (with sample files)
-# Use the frontend interface at http://localhost:3000
+# Test agent analysis endpoint
+curl -X POST http://localhost:8000/api/agent-analyze \
+  -H "Content-Type: application/json" \
+  -d '{"user_query": "Analyze changes", "before_image_base64": "...", "after_image_base64": "..."}'
+
+# Use the Matrix interface at http://localhost:3000
 ```
 
 ### **Matrix UI Testing**
@@ -266,12 +286,18 @@ open http://localhost:8000/docs
 - ✅ Monospace fonts (Courier New)
 - ✅ Matrix-themed terminology ("NEURAL NETWORK", "MATRIX")
 
-### **Functionality Testing**
-1. **Sample Data**: Click sample images to auto-load
-2. **Upload**: Try custom before/after images 
-3. **Analysis**: Click "EXECUTE MCP ANALYSIS"
-4. **Results**: Verify change detection matrix displays
-5. **API**: Check backend logs for MCP tool calls
+### **Agent Functionality Testing**
+1. **Agent Mode**: Select "AI Agent Orchestrated" (recommended)
+2. **Query Config**: Customize agent analysis instructions
+3. **Sample Data**: Click sample images to auto-load
+4. **Upload**: Try custom before/after images
+5. **Analysis**: Click "EXECUTE AI AGENT ANALYSIS"
+6. **Results**: Verify comprehensive agent analysis with:
+   - Change detection metrics
+   - GPT-4 Vision analysis
+   - Significance assessment (HIGH/MEDIUM/LOW)
+   - Tool execution details
+7. **API**: Check backend logs for agent orchestration and MCP tool calls
 
 ## 📁 Project Structure
 
@@ -305,6 +331,7 @@ cd1/
 ├── README.md                          # This file
 ├── MATRIX_README.md                   # Matrix theme documentation
 ├── CLAUDE.md                          # Development knowledge base
+├── .env.example                       # Environment variable template
 └── .gitignore                         # Git exclusions (includes Python cache)
 ```
 
@@ -338,26 +365,31 @@ cd frontend && npm update
 ## 🎯 Current Status
 
 ### ✅ **Implemented (Complete)**
-- **Matrix UI**: Full cyberpunk theme with digital rain
-- **MCP Backend**: FastMCP server with OpenCV + GPT-4 Vision
-- **REST API**: Frontend-backend integration via HTTP
+- **AI Agent System**: OpenAI Agent orchestrating FastMCP tools
+- **Intelligent Analysis**: 3-stage pipeline with significance assessment
+- **Matrix UI**: Full cyberpunk theme with agent control panel
+- **MCP Backend**: FastMCP server with 3 specialized tools
+- **REST API**: Agent endpoints + legacy direct tool access
 - **Sample Data**: Hurricane Ian + LA Wildfire imagery
 - **Deployment**: Railway + Vercel production setup
 - **Local Development**: Automated build and serve scripts
-- **Documentation**: Comprehensive architecture and deployment guides
+- **Comprehensive Analytics**: Multi-tool coordination with synthesis
 
 ### 🔄 **Testing Phase**
-- **UI/UX**: Matrix theme visual validation
-- **Integration**: Frontend-backend API communication
-- **Deployment**: Production environment validation
-- **Performance**: Large image processing optimization
+- **Agent Integration**: OpenAI Agent tool orchestration validation
+- **UI/UX**: Matrix theme and agent control panel validation
+- **Multi-Tool Workflow**: End-to-end agent analysis pipeline
+- **Deployment**: Production environment with agent capabilities
+- **Performance**: Agent response times and token optimization
 
 ### 🚀 **Future Enhancements**
-- **Authentication**: User accounts and session management  
-- **Storage**: Image persistence and history
-- **Advanced Algorithms**: Additional change detection methods
-- **Audio**: Text-to-speech result narration
-- **Real-time**: WebSocket connections for live updates
+- **Enhanced Agent Reasoning**: Advanced prompt engineering and tool chaining
+- **Custom Agent Tools**: Domain-specific MCP tools for different imagery types
+- **Multi-Agent Workflows**: Parallel analysis with specialist agents
+- **Authentication**: User accounts and session management
+- **Storage**: Analysis history and comparison database
+- **Real-time**: WebSocket connections for live agent updates
+- **Agent Memory**: Persistent context across analysis sessions
 
 ## 📖 Additional Documentation
 
@@ -383,8 +415,9 @@ MIT License - see LICENSE file for details
 "There is no spoon. Only data."
 - The Matrix Change Detection Protocol
 
-POWERED BY: OpenCV Neural Networks • GPT-4 Vision AI 
+POWERED BY: OpenAI Agent Orchestration • GPT-4 Vision AI
            MCP Protocol v2.0 • FastAPI Matrix Interface
+           OpenCV Neural Networks • Intelligent Tool Coordination
 ```
 
-**[SYSTEM STATUS: ONLINE] • [MCP TOOLS: ACTIVE] • [NEURAL NETWORK: READY]**
+**[AI AGENT: ONLINE] • [MCP TOOLS: ACTIVE] • [SIGNIFICANCE ASSESSMENT: READY]**
