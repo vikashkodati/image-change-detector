@@ -995,7 +995,7 @@ Note: Database features are currently unavailable, but core analysis capabilitie
                     tool_args = json.loads(tool_call.function.arguments)
                     
                     # Add image data to tool arguments for tools that need them
-                    if tool_name in ["detect_image_changes", "analyze_images_with_gpt4_vision"]:
+                    if tool_name in ["detect_image_changes", "analyze_images_with_gpt4_vision", "generate_and_store_image_embeddings_tool"]:
                         tool_args["before_image_base64"] = before_image_base64
                         tool_args["after_image_base64"] = after_image_base64
                     
