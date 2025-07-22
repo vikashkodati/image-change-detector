@@ -16,10 +16,27 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from openai import OpenAI
 from dotenv import load_dotenv
-from .supabase_client import supabase_client, AnalysisResult
 
 # Load environment variables
 load_dotenv()
+
+# Try to import Supabase client - graceful fallback if not available
+try:
+    from .supabase_client import supabase_client, AnalysisResult
+    SUPABASE_AVAILABLE = True
+    print("✅ Supabase client imported successfully")
+except ImportError as e:
+    print(f"⚠️ Supabase client import failed: {e}")
+    print("📝 Server will run without database features")
+    SUPABASE_AVAILABLE = False
+    supabase_client = None
+    AnalysisResult = None
+except Exception as e:
+    print(f"⚠️ Supabase client initialization failed: {e}")
+    print("📝 Server will run without database features")
+    SUPABASE_AVAILABLE = False
+    supabase_client = None
+    AnalysisResult = None
 
 # Initialize OpenAI client for both GPT-4 Vision analysis and Agent orchestration
 openai_client = None
@@ -405,6 +422,14 @@ async def store_analysis_result_tool(
     Returns:
         Dictionary containing storage result
     """
+    if not SUPABASE_AVAILABLE or not supabase_client:
+        return {
+            "success": False,
+            "error": "Supabase not available - database features disabled",
+            "stored_in_database": False,
+            "tool_used": "store_analysis_result"
+        }
+    
     try:
         analysis_id = await supabase_client.store_analysis_result(
             before_image_base64=before_image_base64,
@@ -426,7 +451,7 @@ async def store_analysis_result_tool(
         else:
             return {
                 "success": False,
-                "error": "Supabase not available",
+                "error": "Storage failed",
                 "stored_in_database": False,
                 "tool_used": "store_analysis_result"
             }
@@ -455,6 +480,14 @@ async def find_similar_analyses_tool(
     Returns:
         Dictionary containing similar analyses
     """
+    if not SUPABASE_AVAILABLE or not supabase_client:
+        return {
+            "success": False,
+            "error": "Supabase not available - historical analysis disabled",
+            "similar_analyses": [],
+            "tool_used": "find_similar_analyses"
+        }
+    
     try:
         similar_analyses = await supabase_client.find_similar_analyses(
             change_percentage=change_percentage,
@@ -496,6 +529,15 @@ async def get_analysis_stats_tool() -> Dict[str, Any]:
     Returns:
         Dictionary containing analysis statistics
     """
+    if not SUPABASE_AVAILABLE or not supabase_client:
+        return {
+            "success": False,
+            "error": "Supabase not available - stats unavailable",
+            "stats": {},
+            "supabase_available": False,
+            "tool_used": "get_analysis_stats"
+        }
+    
     try:
         stats = await supabase_client.get_analysis_stats()
         
@@ -517,13 +559,19 @@ async def get_analysis_stats_tool() -> Dict[str, Any]:
 # Register MCP tools if FastMCP is available
 if mcp:
     try:
+        # Core tools (always available)
         mcp.tool()(detect_image_changes)
         mcp.tool()(analyze_images_with_gpt4_vision)
         mcp.tool()(assess_change_significance)
-        mcp.tool()(store_analysis_result_tool)
-        mcp.tool()(find_similar_analyses_tool)
-        mcp.tool()(get_analysis_stats_tool)
-        print("✅ MCP tools registered successfully (including Supabase tools)")
+        
+        # Supabase tools (only if available)
+        if SUPABASE_AVAILABLE:
+            mcp.tool()(store_analysis_result_tool)
+            mcp.tool()(find_similar_analyses_tool)
+            mcp.tool()(get_analysis_stats_tool)
+            print("✅ MCP tools registered successfully (including Supabase tools)")
+        else:
+            print("✅ MCP core tools registered successfully (Supabase tools disabled)")
     except Exception as e:
         print(f"⚠️ MCP tool registration failed: {e}")
 
@@ -533,7 +581,11 @@ class SatelliteChangeDetectionAgent:
     
     def __init__(self, openai_client: OpenAI):
         self.client = openai_client
-        self.tools = [
+        self.tools = self._build_tools_list()
+    
+    def _build_tools_list(self):
+        """Build tools list conditionally based on available components"""
+        tools = [
             {
                 "type": "function",
                 "function": {
@@ -604,100 +656,111 @@ class SatelliteChangeDetectionAgent:
                         "required": ["change_percentage", "contours_count"]
                     }
                 }
-            },
-            {
-                "type": "function",
-                "function": {
-                    "name": "store_analysis_result_tool",
-                    "description": "Store analysis result in database for history and future reference",
-                    "parameters": {
-                        "type": "object",
-                        "properties": {
-                            "before_image_base64": {
-                                "type": "string",
-                                "description": "Base64 encoded before image"
-                            },
-                            "after_image_base64": {
-                                "type": "string",
-                                "description": "Base64 encoded after image"
-                            },
-                            "change_results": {
-                                "type": "object",
-                                "description": "Results from change detection analysis"
-                            },
-                            "agent_analysis": {
-                                "type": "string",
-                                "description": "Agent's comprehensive analysis text"
-                            },
-                            "tools_used": {
-                                "type": "array",
-                                "items": {"type": "string"},
-                                "description": "List of tools used in analysis"
-                            },
-                            "user_id": {
-                                "type": "string",
-                                "description": "Optional user identifier"
-                            }
-                        },
-                        "required": ["before_image_base64", "after_image_base64", "change_results"]
-                    }
-                }
-            },
-            {
-                "type": "function",
-                "function": {
-                    "name": "find_similar_analyses_tool",
-                    "description": "Find similar analysis results from database for comparison and context",
-                    "parameters": {
-                        "type": "object",
-                        "properties": {
-                            "change_percentage": {
-                                "type": "number",
-                                "description": "Percentage of change detected"
-                            },
-                            "significance_level": {
-                                "type": "string",
-                                "description": "Significance level (HIGH/MEDIUM/LOW/MINIMAL)"
-                            },
-                            "limit": {
-                                "type": "integer",
-                                "description": "Maximum number of similar analyses to return"
-                            }
-                        },
-                        "required": ["change_percentage", "significance_level"]
-                    }
-                }
-            },
-            {
-                "type": "function",
-                "function": {
-                    "name": "get_analysis_stats_tool",
-                    "description": "Get system-wide analysis statistics and trends",
-                    "parameters": {
-                        "type": "object",
-                        "properties": {},
-                        "required": []
-                    }
-                }
             }
         ]
+        
+        # Add Supabase tools if available
+        if SUPABASE_AVAILABLE:
+            tools.extend([
+                {
+                    "type": "function",
+                    "function": {
+                        "name": "store_analysis_result_tool",
+                        "description": "Store analysis result in database for history and future reference",
+                        "parameters": {
+                            "type": "object",
+                            "properties": {
+                                "before_image_base64": {
+                                    "type": "string",
+                                    "description": "Base64 encoded before image"
+                                },
+                                "after_image_base64": {
+                                    "type": "string",
+                                    "description": "Base64 encoded after image"
+                                },
+                                "change_results": {
+                                    "type": "object",
+                                    "description": "Results from change detection analysis"
+                                },
+                                "agent_analysis": {
+                                    "type": "string",
+                                    "description": "Agent's comprehensive analysis text"
+                                },
+                                "tools_used": {
+                                    "type": "array",
+                                    "items": {"type": "string"},
+                                    "description": "List of tools used in analysis"
+                                },
+                                "user_id": {
+                                    "type": "string",
+                                    "description": "Optional user identifier"
+                                }
+                            },
+                            "required": ["before_image_base64", "after_image_base64", "change_results"]
+                        }
+                    }
+                },
+                {
+                    "type": "function",
+                    "function": {
+                        "name": "find_similar_analyses_tool",
+                        "description": "Find similar analysis results from database for comparison and context",
+                        "parameters": {
+                            "type": "object",
+                            "properties": {
+                                "change_percentage": {
+                                    "type": "number",
+                                    "description": "Percentage of change detected"
+                                },
+                                "significance_level": {
+                                    "type": "string",
+                                    "description": "Significance level (HIGH/MEDIUM/LOW/MINIMAL)"
+                                },
+                                "limit": {
+                                    "type": "integer",
+                                    "description": "Maximum number of similar analyses to return"
+                                }
+                            },
+                            "required": ["change_percentage", "significance_level"]
+                        }
+                    }
+                },
+                {
+                    "type": "function",
+                    "function": {
+                        "name": "get_analysis_stats_tool",
+                        "description": "Get system-wide analysis statistics and trends",
+                        "parameters": {
+                            "type": "object",
+                            "properties": {},
+                            "required": []
+                        }
+                    }
+                }
+            ])
+        
+        return tools
     
     async def analyze_satellite_images(self, before_image_base64: str, after_image_base64: str, user_query: str) -> Dict[str, Any]:
         """Main agent method to orchestrate satellite image analysis"""
         
         try:
             # System prompt for the agent
-            system_prompt = """You are an expert satellite image analysis agent with access to specialized tools for change detection, assessment, and database operations.
+            # Build system prompt based on available tools
+            base_prompt = """You are an expert satellite image analysis agent with access to specialized tools for change detection and assessment.
 
 IMPORTANT: The user has already provided two satellite images (before and after) that are ready for analysis. Do NOT ask for images or any additional information. Start analysis immediately using your tools.
 
 Your role is to:
 1. Use computer vision tools to detect pixel-level changes
 2. Use AI vision analysis for semantic understanding 
-3. Assess the significance and implications of changes
-4. Store results in database for future reference and learning
-5. Find similar analyses for additional context
-6. Provide comprehensive, actionable insights
+3. Assess the significance and implications of changes"""
+
+            if SUPABASE_AVAILABLE:
+                enhanced_prompt = base_prompt + """
+4. Find similar analyses for additional context (database available)
+5. Store results in database for future reference and learning
+6. Provide comprehensive, actionable insights with historical context
 
 ENHANCED WORKFLOW - Execute immediately without asking questions:
 1. FIRST: Call detect_image_changes tool to analyze pixel-level differences
@@ -713,9 +776,25 @@ AVAILABLE TOOLS:
 - assess_change_significance: Significance and urgency assessment
 - find_similar_analyses_tool: Database search for similar historical analyses
 - store_analysis_result_tool: Save results for future reference
-- get_analysis_stats_tool: System-wide analytics (optional)
+- get_analysis_stats_tool: System-wide analytics (optional)"""
+            else:
+                enhanced_prompt = base_prompt + """
+4. Provide comprehensive, actionable insights
 
-The satellite images are already available to your tools. Begin analysis immediately with detect_image_changes."""
+CORE WORKFLOW - Execute immediately without asking questions:
+1. FIRST: Call detect_image_changes tool to analyze pixel-level differences
+2. SECOND: Call analyze_images_with_gpt4_vision tool for semantic analysis
+3. THIRD: Call assess_change_significance tool based on detection results
+4. FOURTH: Provide comprehensive summary combining all tool results
+
+AVAILABLE TOOLS:
+- detect_image_changes: OpenCV computer vision analysis
+- analyze_images_with_gpt4_vision: GPT-4 Vision semantic understanding
+- assess_change_significance: Significance and urgency assessment
+
+Note: Database features are currently unavailable, but core analysis capabilities are fully functional."""
+
+            system_prompt = enhanced_prompt + "\n\nThe satellite images are already available to your tools. Begin analysis immediately with detect_image_changes."
 
             # Initial conversation with the agent
             messages = [
@@ -758,11 +837,20 @@ The satellite images are already available to your tools. Begin analysis immedia
                     elif tool_name == "assess_change_significance":
                         result = await assess_change_significance(**tool_args)
                     elif tool_name == "store_analysis_result_tool":
-                        result = await store_analysis_result_tool(**tool_args)
+                        if SUPABASE_AVAILABLE:
+                            result = await store_analysis_result_tool(**tool_args)
+                        else:
+                            result = {"error": "Database features not available"}
                     elif tool_name == "find_similar_analyses_tool":
-                        result = await find_similar_analyses_tool(**tool_args)
+                        if SUPABASE_AVAILABLE:
+                            result = await find_similar_analyses_tool(**tool_args)
+                        else:
+                            result = {"error": "Database features not available"}
                     elif tool_name == "get_analysis_stats_tool":
-                        result = await get_analysis_stats_tool(**tool_args)
+                        if SUPABASE_AVAILABLE:
+                            result = await get_analysis_stats_tool(**tool_args)
+                        else:
+                            result = {"error": "Database features not available"}
                     else:
                         result = {"error": f"Unknown tool: {tool_name}"}
                     
@@ -852,20 +940,33 @@ async def health_endpoint():
         test_array = np.array([[1, 2], [3, 4]])
         cv2_available = hasattr(cv2, 'cvtColor')
         
-        # Check Supabase health
-        supabase_health = await supabase_client.health_check()
+        # Check Supabase health (only if available)
+        supabase_health = {"status": "unavailable", "connected": False}
+        database_features = False
+        
+        if SUPABASE_AVAILABLE and supabase_client:
+            try:
+                supabase_health = await supabase_client.health_check()
+                database_features = supabase_client.is_connected
+            except Exception as e:
+                supabase_health = {
+                    "status": "error", 
+                    "connected": False, 
+                    "error": f"Health check failed: {str(e)}"
+                }
         
         return {
             "status": "healthy",
-            "service": "AI Agent-Powered Satellite Change Detector with Supabase",
+            "service": "AI Agent-Powered Satellite Change Detector" + (" with Supabase" if SUPABASE_AVAILABLE else ""),
             "version": "2.1.0",
             "opencv_available": cv2_available,
             "numpy_available": True,
             "openai_available": openai_client is not None,
             "agent_available": agent is not None,
             "mcp_tools_available": True,
+            "supabase_available": SUPABASE_AVAILABLE,
             "supabase_status": supabase_health,
-            "database_features": supabase_client.is_connected
+            "database_features": database_features
         }
     except Exception as e:
         return {
@@ -1018,7 +1119,9 @@ if __name__ == "__main__":
     print(f"📦 FastMCP available: {mcp is not None}")
     print(f"🤖 OpenAI client available: {openai_client is not None}")
     print(f"🎯 Agent available: {agent is not None}")
-    print(f"🗄️ Supabase connected: {supabase_client.is_connected}")
+    print(f"🗄️ Supabase available: {SUPABASE_AVAILABLE}")
+    if SUPABASE_AVAILABLE and supabase_client:
+        print(f"🗄️ Supabase connected: {supabase_client.is_connected}")
     print(f"🔧 App object: {type(app).__name__}")
     
     # Test health endpoint before starting server
