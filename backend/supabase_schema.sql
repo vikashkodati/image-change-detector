@@ -107,7 +107,8 @@ CREATE POLICY "Allow anonymous insert access" ON image_embeddings FOR INSERT WIT
 CREATE POLICY "Allow anonymous update access" ON image_embeddings FOR UPDATE USING (true);
 
 -- Sample views for analytics
-CREATE VIEW IF NOT EXISTS analysis_summary AS
+DROP VIEW IF EXISTS analysis_summary;
+CREATE VIEW analysis_summary AS
 SELECT 
     significance_level,
     COUNT(*) as count,
@@ -117,7 +118,8 @@ SELECT
 FROM analysis_results 
 GROUP BY significance_level;
 
-CREATE VIEW IF NOT EXISTS daily_analysis_count AS
+DROP VIEW IF EXISTS daily_analysis_count;
+CREATE VIEW daily_analysis_count AS
 SELECT 
     DATE(created_at) as analysis_date,
     COUNT(*) as daily_count,

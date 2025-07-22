@@ -22,7 +22,13 @@ load_dotenv()
 
 # Try to import Supabase client - graceful fallback if not available
 try:
-    from .supabase_client import supabase_client, AnalysisResult
+    # Try relative import first (for module usage)
+    try:
+        from .supabase_client import supabase_client, AnalysisResult
+    except ImportError:
+        # Fallback to absolute import (for direct script execution)
+        from supabase_client import supabase_client, AnalysisResult
+    
     SUPABASE_AVAILABLE = True
     print("✅ Supabase client imported successfully")
 except ImportError as e:
