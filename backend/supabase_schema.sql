@@ -29,7 +29,7 @@ CREATE TABLE IF NOT EXISTS analysis_results (
 CREATE TABLE IF NOT EXISTS image_embeddings (
     id TEXT PRIMARY KEY,
     image_hash TEXT UNIQUE NOT NULL,
-    embedding vector(512), -- Adjust dimension based on your embedding model
+    embedding vector(1536), -- OpenAI text-embedding-3-small dimension
     metadata JSONB DEFAULT '{}',
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
@@ -130,7 +130,7 @@ ORDER BY analysis_date DESC;
 
 -- Functions for advanced queries
 CREATE OR REPLACE FUNCTION find_similar_images(
-    target_embedding vector(512),
+    target_embedding vector(1536),
     similarity_threshold float DEFAULT 0.8,
     max_results int DEFAULT 10
 )

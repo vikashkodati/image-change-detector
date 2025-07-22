@@ -6,6 +6,7 @@ import base64
 import json
 from io import BytesIO
 from typing import Dict, Any, Optional, List
+from datetime import datetime, timezone
 
 import cv2
 import numpy as np
@@ -562,6 +563,140 @@ async def get_analysis_stats_tool() -> Dict[str, Any]:
             "tool_used": "get_analysis_stats"
         }
 
+async def generate_and_store_image_embeddings_tool(
+    before_image_base64: str,
+    after_image_base64: str,
+    analysis_context: str = None
+) -> Dict[str, Any]:
+    """
+    Generate and store vector embeddings for both images using OpenAI embeddings.
+    
+    Args:
+        before_image_base64: Base64 encoded before image
+        after_image_base64: Base64 encoded after image
+        analysis_context: Optional context from previous analysis
+    
+    Returns:
+        Dictionary containing embedding generation and storage results
+    """
+    if not SUPABASE_AVAILABLE or not supabase_client:
+        return {
+            "success": False,
+            "error": "Supabase not available - embedding storage disabled",
+            "embeddings_stored": False,
+            "tool_used": "generate_and_store_image_embeddings"
+        }
+    
+    if not openai_client:
+        return {
+            "success": False,
+            "error": "OpenAI client not available for embedding generation",
+            "embeddings_stored": False,
+            "tool_used": "generate_and_store_image_embeddings"
+        }
+    
+    try:
+        stored_embeddings = []
+        
+        # Process both images
+        for image_label, image_data in [("before", before_image_base64), ("after", after_image_base64)]:
+            try:
+                # Generate embedding using OpenAI
+                # Create a text description for embedding
+                description_prompt = f"""Analyze this satellite image and provide a concise description focusing on:
+                - Geographic features (urban, rural, water bodies, vegetation)
+                - Infrastructure visible (buildings, roads, industrial areas)
+                - Land use patterns
+                - Notable characteristics for change detection
+                
+                This is the {image_label} image in a change detection analysis."""
+                
+                # Get text embedding of image analysis
+                description_response = await asyncio.get_event_loop().run_in_executor(
+                    None,
+                    lambda: openai_client.chat.completions.create(
+                        model="gpt-4o-mini",  # Use faster model for descriptions
+                        messages=[
+                            {
+                                "role": "user",
+                                "content": [
+                                    {"type": "text", "text": description_prompt},
+                                    {
+                                        "type": "image_url",
+                                        "image_url": {"url": f"data:image/jpeg;base64,{image_data.split(',')[-1]}"}
+                                    }
+                                ]
+                            }
+                        ],
+                        max_tokens=200
+                    )
+                )
+                
+                image_description = description_response.choices[0].message.content
+                
+                # Generate embedding from the description
+                embedding_response = await asyncio.get_event_loop().run_in_executor(
+                    None,
+                    lambda: openai_client.embeddings.create(
+                        model="text-embedding-3-small",
+                        input=image_description
+                    )
+                )
+                
+                embedding_vector = embedding_response.data[0].embedding
+                
+                # Prepare metadata
+                metadata = {
+                    "image_type": image_label,
+                    "description": image_description,
+                    "analysis_context": analysis_context,
+                    "embedding_model": "text-embedding-3-small",
+                    "description_model": "gpt-4o-mini",
+                    "generated_at": datetime.now(timezone.utc).isoformat()
+                }
+                
+                # Store embedding in Supabase
+                image_hash = await supabase_client.store_image_embedding(
+                    image_base64=image_data,
+                    embedding=embedding_vector,
+                    metadata=metadata
+                )
+                
+                if image_hash:
+                    stored_embeddings.append({
+                        "image_type": image_label,
+                        "image_hash": image_hash,
+                        "embedding_dimension": len(embedding_vector),
+                        "description": image_description[:100] + "..." if len(image_description) > 100 else image_description
+                    })
+                    print(f"✅ {image_label.title()} image embedding stored: {image_hash}")
+                
+            except Exception as e:
+                print(f"❌ Failed to process {image_label} image embedding: {e}")
+                stored_embeddings.append({
+                    "image_type": image_label,
+                    "error": str(e),
+                    "embedding_dimension": 0
+                })
+        
+        success_count = len([e for e in stored_embeddings if "error" not in e])
+        
+        return {
+            "success": success_count > 0,
+            "embeddings_stored": success_count,
+            "total_images": 2,
+            "stored_embeddings": stored_embeddings,
+            "tool_used": "generate_and_store_image_embeddings"
+        }
+        
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e),
+            "embeddings_stored": False,
+            "tool_used": "generate_and_store_image_embeddings"
+        }
+
 # Register MCP tools if FastMCP is available
 if mcp:
     try:
@@ -575,7 +710,8 @@ if mcp:
             mcp.tool()(store_analysis_result_tool)
             mcp.tool()(find_similar_analyses_tool)
             mcp.tool()(get_analysis_stats_tool)
-            print("✅ MCP tools registered successfully (including Supabase tools)")
+            mcp.tool()(generate_and_store_image_embeddings_tool)
+            print("✅ MCP tools registered successfully (including Supabase + embedding tools)")
         else:
             print("✅ MCP core tools registered successfully (Supabase tools disabled)")
     except Exception as e:
@@ -742,6 +878,31 @@ class SatelliteChangeDetectionAgent:
                             "required": []
                         }
                     }
+                },
+                {
+                    "type": "function",
+                    "function": {
+                        "name": "generate_and_store_image_embeddings_tool",
+                        "description": "Generate and store vector embeddings for both images for semantic similarity search",
+                        "parameters": {
+                            "type": "object",
+                            "properties": {
+                                "before_image_base64": {
+                                    "type": "string",
+                                    "description": "Base64 encoded before image"
+                                },
+                                "after_image_base64": {
+                                    "type": "string",
+                                    "description": "Base64 encoded after image"
+                                },
+                                "analysis_context": {
+                                    "type": "string",
+                                    "description": "Optional context from previous analysis steps"
+                                }
+                            },
+                            "required": ["before_image_base64", "after_image_base64"]
+                        }
+                    }
                 }
             ])
         
@@ -764,22 +925,25 @@ Your role is to:
 
             if SUPABASE_AVAILABLE:
                 enhanced_prompt = base_prompt + """
-4. Find similar analyses for additional context (database available)
-5. Store results in database for future reference and learning
-6. Provide comprehensive, actionable insights with historical context
+4. Generate and store image embeddings for semantic similarity search
+5. Find similar analyses for additional context (database available)
+6. Store results in database for future reference and learning
+7. Provide comprehensive, actionable insights with historical context
 
 ENHANCED WORKFLOW - Execute immediately without asking questions:
 1. FIRST: Call detect_image_changes tool to analyze pixel-level differences
 2. SECOND: Call analyze_images_with_gpt4_vision tool for semantic analysis
 3. THIRD: Call assess_change_significance tool based on detection results
-4. FOURTH: Call find_similar_analyses_tool to get historical context
-5. FIFTH: Call store_analysis_result_tool to save results for future reference
-6. SIXTH: Provide comprehensive summary combining all tool results with historical context
+4. FOURTH: Call generate_and_store_image_embeddings_tool to create semantic vectors
+5. FIFTH: Call find_similar_analyses_tool to get historical context
+6. SIXTH: Call store_analysis_result_tool to save results for future reference
+7. SEVENTH: Provide comprehensive summary combining all tool results with historical context
 
 AVAILABLE TOOLS:
 - detect_image_changes: OpenCV computer vision analysis
 - analyze_images_with_gpt4_vision: GPT-4 Vision semantic understanding
 - assess_change_significance: Significance and urgency assessment
+- generate_and_store_image_embeddings_tool: Create and store semantic image vectors
 - find_similar_analyses_tool: Database search for similar historical analyses
 - store_analysis_result_tool: Save results for future reference
 - get_analysis_stats_tool: System-wide analytics (optional)"""
@@ -855,6 +1019,11 @@ Note: Database features are currently unavailable, but core analysis capabilitie
                     elif tool_name == "get_analysis_stats_tool":
                         if SUPABASE_AVAILABLE:
                             result = await get_analysis_stats_tool(**tool_args)
+                        else:
+                            result = {"error": "Database features not available"}
+                    elif tool_name == "generate_and_store_image_embeddings_tool":
+                        if SUPABASE_AVAILABLE:
+                            result = await generate_and_store_image_embeddings_tool(**tool_args)
                         else:
                             result = {"error": "Database features not available"}
                     else:
